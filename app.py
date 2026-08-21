@@ -3,6 +3,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
 import json
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
 
 st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵", layout="wide")
@@ -10,25 +13,18 @@ st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵",
 # --- PALETA DE CORES DARK & GOLD (PLANILHA) ---
 st.markdown("""
 <style>
-    /* Fundo geral e fontes */
     .stApp {
         background-color: #121212;
         color: #F3E5AB;
     }
-    
-    /* Barra Lateral */
     section[data-testid="stSidebar"] {
         background-color: #1A1A1A;
         border-right: 1px solid #2A2415;
     }
-    
-    /* Títulos e Cabeçalhos */
     h1, h2, h3, h4, h5, h6 {
         color: #D4AF37 !important;
         font-family: 'Segoe UI', sans-serif;
     }
-    
-    /* Abas / Tabs */
     button[data-baseweb="tab"] {
         color: #CCCCCC !important;
         background-color: transparent !important;
@@ -38,8 +34,6 @@ st.markdown("""
         border-bottom-color: #D4AF37 !important;
         font-weight: bold;
     }
-    
-    /* Cards de Métricas */
     div[data-testid="stMetric"] {
         background-color: #1E1E1E;
         border: 1px solid #2A2415;
@@ -47,8 +41,6 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
     }
-    
-    /* Botões */
     div.stButton > button {
         background-color: #2A2415;
         color: #D4AF37;
@@ -62,8 +54,6 @@ st.markdown("""
         color: #121212;
         border-color: #D4AF37;
     }
-    
-    /* Inputs */
     input, textarea, select {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
@@ -72,11 +62,46 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- FUNÇÃO PARA ENVIO DE E-MAIL DE BOAS-VINDAS ---
+def enviar_email_boas_vindas(destinatario_email, nome_usuario):
+    remetente = st.secrets.get("EMAIL_REMETENTE", "")
+    senha_remetente = st.secrets.get("EMAIL_SENHA", "")
+    
+    # Se as credenciais estiverem configuradas nos secrets do Streamlit
+    if remetente and senha_remetente:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = "🚀 Bem-vindo ao seu Gestor Financeiro Inteligente!"
+            msg["From"] = f"Gestor Financeiro <{remetente}>"
+            msg["To"] = destinatario_email
+            
+            html = f"""
+            <div style="font-family: Arial, sans-serif; background-color: #121212; color: #F3E5AB; padding: 25px; border-radius: 10px; border: 1px solid #D4AF37;">
+                <h2 style="color: #D4AF37;">Olá, {nome_usuario}! 👋</h2>
+                <p>Sua conta no <b>Gestor Financeiro Inteligente</b> foi criada com sucesso.</p>
+                <p>Agora você pode subir seus extratos bancários em PDF para ter uma visão completa das suas receitas, despesas e projeção financeira.</p>
+                <br>
+                <a href="https://share.streamlit.io" style="background-color: #D4AF37; color: #121212; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 5px;">Acessar Meu Painel</a>
+                <br><br>
+                <small style="color: #888888;">Mensagem automática gerada pelo Gestor Financeiro.</small>
+            </div>
+            """
+            msg.attach(MIMEText(html, "html"))
+            
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+                servidor.login(remetente, senha_remetente)
+                servidor.sendmail(remetente, destinatario_email, msg.as_string())
+            return True, "E-mail de boas-vindas enviado com sucesso!"
+        except Exception as e:
+            return False, f"Conta criada, mas ocorreu um erro no envio do e-mail: {e}"
+    else:
+        return True, "Conta criada! (Configure EMAIL_REMETENTE e EMAIL_SENHA nos Secrets para disparo real)."
+
 # --- 1. GERENCIAMENTO DE USUÁRIOS, PLANOS E SESSÃO ---
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
-        "admin": {"senha": "admin123", "plano": "Pro"},
-        "Marcos": {"senha": "1234", "plano": "Pro"}
+        "admin": {"email": "admin@gestor.com", "senha": "admin123", "plano": "Pro"},
+        "Marcos": {"email": "marcos@gestor.com", "senha": "1234", "plano": "Pro"}
     }
 
 if "autenticado" not in st.session_state:
@@ -111,28 +136,36 @@ def tela_autenticacao():
                     
         with aba_cadastro:
             st.subheader("Novo Cadastro")
-            novo_usuario = st.text_input("Escolha um Nome de Usuário", key="cad_user")
-            nova_senha = st.text_input("Crie uma Senha", type="password", key="cad_pass")
+            novo_usuario = st.text_input("Nome de Usuário", key="cad_user")
+            novo_email = st.text_input("E-mail", placeholder="seuemail@exemplo.com", key="cad_email")
+            nova_senha = st.text_input("Senha", type="password", key="cad_pass")
             confirma_senha = st.text_input("Confirme sua Senha", type="password", key="cad_pass_conf")
             
             if st.button("Cadastrar", use_container_width=True):
-                if not novo_usuario or not nova_senha:
-                    st.warning("Preencha todos os campos.")
+                if not novo_usuario or not novo_email or not nova_senha:
+                    st.warning("Preencha todos os campos (Nome, E-mail e Senha).")
+                elif "@" not in novo_email or "." not in novo_email:
+                    st.error("Por favor, insira um e-mail válido.")
                 elif novo_usuario in st.session_state["usuarios_db"]:
                     st.error("Este nome de usuário já existe.")
                 elif nova_senha != confirma_senha:
                     st.error("As senhas não coincidem.")
                 else:
-                    st.session_state["usuarios_db"][novo_usuario] = {"senha": nova_senha, "plano": "Gratuito"}
-                    st.success("Conta criada com sucesso! Acesse na aba 'Entrar'.")
+                    st.session_state["usuarios_db"][novo_usuario] = {
+                        "email": novo_email,
+                        "senha": nova_senha,
+                        "plano": "Gratuito"
+                    }
+                    sucesso_email, msg_email = enviar_email_boas_vindas(novo_email, novo_usuario)
+                    st.success(f"🎉 Conta criada com sucesso para **{novo_usuario}**! {msg_email}")
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
 
-# Recupera o plano do usuário logado
+# Recupera dados do usuário logado
 usuario_atual = st.session_state.get("usuario_logado", "")
-dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito"})
+dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito", "email": ""})
 plano_atual = dados_usuario.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
 
@@ -147,6 +180,7 @@ except Exception:
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown(f"### 👤 {usuario_atual}")
+    st.caption(f"📧 {dados_usuario.get('email', '')}")
     if eh_pro:
         st.markdown("<span style='background-color:#2A2415; color:#D4AF37; padding:4px 8px; border-radius:6px; border:1px solid #D4AF37; font-weight:bold;'>⭐ Plano PRO</span>", unsafe_allow_html=True)
     else:
@@ -158,7 +192,7 @@ with st.sidebar:
         with st.expander("👥 Gerenciar Usuários & Planos"):
             for u, dados in list(st.session_state["usuarios_db"].items()):
                 col_u1, col_u2 = st.columns([2, 1])
-                col_u1.write(f"**{u}** ({dados['plano']})")
+                col_u1.write(f"**{u}**\n*{dados.get('email','')}* ({dados['plano']})")
                 if dados["plano"] == "Gratuito":
                     if col_u2.button("Virar Pro", key=f"btn_pro_{u}"):
                         st.session_state["usuarios_db"][u]["plano"] = "Pro"
