@@ -33,7 +33,7 @@ st.markdown("""
         border-right: 1px solid rgba(212, 175, 55, 0.12) !important;
     }
     
-    /* Tipografia de Marca */
+    /* Tipografia da Marca */
     .brand-title {
         font-size: 2.8rem;
         font-weight: 900;
@@ -51,7 +51,7 @@ st.markdown("""
         font-weight: 600;
     }
 
-    /* Cards e Containers Glass */
+    /* Containers Glass */
     .glass-card {
         background: rgba(18, 20, 26, 0.7);
         border: 1px solid rgba(212, 175, 55, 0.15);
@@ -89,7 +89,7 @@ st.markdown("""
         margin: 0;
     }
 
-    /* Botões Padrão XP */
+    /* Botões Dourados XP */
     div.stButton > button {
         background: #d4af37 !important;
         color: #08090b !important;
@@ -255,6 +255,7 @@ usuario_atual = st.session_state.get("usuario_logado", "")
 dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito", "email": ""})
 plano_atual = dados_usuario.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
+user_email = dados_usuario.get("email", "")
 
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
@@ -267,14 +268,14 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
+    badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
+    
     st.markdown(f"""
         <div style="background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;">
             <div style="font-size: 0.72rem; color: #777; text-transform: uppercase;">Usuário</div>
             <div style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">{usuario_atual}</div>
-            <div style="font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;">{dados_usuario.get('email', '')}</div>
-            <span class="{ 'pro-tag' if eh_pro else '' }" style="{ '' if eh_pro else 'background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;' }">
-                { '⭐ PLANO PRO' if eh_pro else 'PLANO BÁSICO' }
-            </span>
+            <div style="font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;">{user_email}</div>
+            {badge_html}
         </div>
     """, unsafe_allow_html=True)
     
@@ -372,9 +373,12 @@ def processar_extrato_pdf(file, chave_api):
         raise ultimo_erro
         
     res_text = response.text.strip()
-    if res_text.startswith("```json"): res_text = res_text[7:]
-    if res_text.startswith("```"): res_text = res_text[3:]
-    if res_text.endswith("```"): res_text = res_text[:-3]
+    if res_text.startswith("```json"):
+        res_text = res_text[7:]
+    if res_text.startswith("```"):
+        res_text = res_text[3:]
+    if res_text.endswith("```"):
+        res_text = res_text[:-3]
     return json.loads(res_text.strip())
 
 # ==========================================
@@ -401,32 +405,4 @@ if menu_selecionado == "📥 Upload de Extratos":
     st.write("")
     if arquivos and st.button("🚀 Processar Extratos com Inteligência Artificial", use_container_width=True):
         if not api_key:
-            st.error("Chave de API não configurada. Adicione aos Secrets do Streamlit ou na barra lateral.")
-        else:
-            todas_transacoes = []
-            with st.spinner(f"Processando {len(arquivos)} documento(s)..."):
-                for arq in arquivos:
-                    try:
-                        res = processar_extrato_pdf(arq, api_key)
-                        todas_transacoes.extend(res)
-                    except Exception as err:
-                        st.error(f"Erro em {arq.name}: {err}")
-                
-                if todas_transacoes:
-                    st.session_state["transacoes"].extend(todas_transacoes)
-                    st.success(f"✨ Sucesso! {len(todas_transacoes)} movimentações consolidadas.")
-                    st.info("👉 Acesse a aba **📊 Dashboard & Métricas** para ver a análise.")
-
-# ==========================================
-# 📊 ABA 2: DASHBOARD & MÉTRICAS
-# ==========================================
-elif menu_selecionado == "📊 Dashboard & Métricas":
-    df_raw = pd.DataFrame(st.session_state["transacoes"])
-    
-    if df_raw.empty:
-        st.markdown("""
-            <div class="glass-card" style="text-align:center; padding: 40px;">
-                <h3 style="color:#888;">Nenhum Extrato Importado</h3>
-                <p style="color:#666;">Faça o upload do seu primeiro PDF bancário na aba 'Upload de Extratos'.</p>
-            </div>
-        """, unsafe_allow_html=True
+            st.error("Chave de API não configurada. Adicione
