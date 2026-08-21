@@ -2,5 +2,4 @@ streamlit
 pandas
 plotly
 pypdf
-google-genai
-streamlit-authenticator
+google-generativeai
