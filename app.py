@@ -104,7 +104,6 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
     }
 
-    /* Estilo para links de pagamento */
     .btn-mp {
         display: block;
         text-align: center;
@@ -191,11 +190,11 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
             return False, f"Erro no envio do e-mail: {e}"
     return True, "(Configure credenciais no Secrets para disparo real)."
 
-# --- BANCO DE DADOS & SESSÃO ---
+# --- BANCO DE DADOS & SESSÃO (MARCOS DEFINIDO COMO GRATUITO PARA TESTE) ---
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
-        "Marcos": {"email": "marcos@mfc.com", "senha": "1234", "plano": "Pro"}
+        "Marcos": {"email": "marcos@mfc.com", "senha": "1234", "plano": "Gratuito"}
     }
 
 if "autenticado" not in st.session_state:
