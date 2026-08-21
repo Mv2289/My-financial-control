@@ -8,7 +8,7 @@ from pypdf import PdfReader
 
 st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵", layout="wide")
 
-# --- PALETA DE CORES DARK & GOLD ---
+# --- PALETA DE CORES DA SUA PLANILHA (CSS PERSONALIZADO) ---
 st.markdown("""
 <style>
     .stApp {
@@ -155,7 +155,7 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# --- 2. FUNÇÃO PARA LER EXTRATO COM GEMINI ---
+# --- 2. FUNÇÃO INTELIGENTE PARA LER EXTRATO COM GEMINI ---
 def processar_extrato_pdf(file, chave_api):
     reader = PdfReader(file)
     texto_extrato = ""
@@ -166,11 +166,29 @@ def processar_extrato_pdf(file, chave_api):
         raise Exception("Não foi possível extrair texto do PDF. O arquivo pode ser uma imagem escaneada.")
 
     genai.configure(api_key=chave_api)
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config={"response_mime_type": "application/json"}
-    )
     
+    # Busca automaticamente os modelos compatíveis com generateContent na sua conta
+    modelos_disponiveis = []
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                modelos_disponiveis.append(m.name)
+    except Exception:
+        pass
+    
+    # Ordem de preferência para os modelos mais rápidos e modernos
+    preferencias = [
+        "models/gemini-2.5-flash",
+        "models/gemini-2.0-flash",
+        "models/gemini-flash-latest",
+        "models/gemini-1.5-flash",
+        "models/gemini-pro"
+    ]
+    
+    candidatos = [m for m in preferencias if m in modelos_disponiveis]
+    if not candidatos:
+        candidatos = modelos_disponiveis if modelos_disponiveis else ["gemini-2.5-flash", "gemini-2.0-flash"]
+
     prompt = f"""
     Você é um assistente financeiro especialista. Analise o extrato bancário abaixo e extraia TODAS as transações.
     Retorne EXCLUSIVAMENTE um array JSON contendo objetos com os seguintes campos:
@@ -184,7 +202,24 @@ def processar_extrato_pdf(file, chave_api):
     {texto_extrato}
     """
     
-    response = model.generate_content(prompt)
+    response = None
+    ultimo_erro = None
+    
+    for modelo_escolhido in candidatos:
+        try:
+            model = genai.GenerativeModel(
+                model_name=modelo_escolhido,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            response = model.generate_content(prompt)
+            if response and response.text:
+                break
+        except Exception as e:
+            ultimo_erro = e
+            continue
+            
+    if response is None:
+        raise ultimo_erro
     
     texto_resposta = response.text.strip()
     if texto_resposta.startswith("```json"):
@@ -241,6 +276,7 @@ with tab_dashboard:
         saldo_liquido = total_entradas - total_saidas
         taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0
         
+        # Cards de KPI
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(f"""
             <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; text-align: center;">
@@ -272,6 +308,7 @@ with tab_dashboard:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
+        # Gráficos
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             df_despesas = df[df["tipo"] == "Despesa"]
