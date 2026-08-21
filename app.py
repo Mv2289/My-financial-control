@@ -104,6 +104,27 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
     }
 
+    /* Estilo para links de pagamento */
+    .btn-mp {
+        display: block;
+        text-align: center;
+        background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%);
+        color: #ffffff !important;
+        text-decoration: none;
+        font-weight: 700;
+        padding: 14px 20px;
+        border-radius: 8px;
+        letter-spacing: 0.5px;
+        font-size: 1rem;
+        box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        margin: 15px 0;
+    }
+    .btn-mp:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 158, 227, 0.5);
+    }
+
     button[data-baseweb="tab"] {
         color: #888888 !important;
         font-weight: 600 !important;
@@ -593,7 +614,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO
+# ⭐ ABA 4: ASSINATURA PRO (INTEGRADA AO MERCADO PAGO)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -634,32 +655,36 @@ elif menu_selecionado == "⭐ Assinatura PRO":
                     <li>✔ <b>Upload de múltiplos PDFs de uma só vez</b></li>
                     <li>✔ <b>Módulo completo de Planejamento Futuro</b></li>
                     <li>✔ Consolidação multi-bancos sem limites</li>
-                    <li>✔ Processamento prioritário de alta velocidade</li>
+                    <li>✔ Processamento de alta velocidade</li>
                 </ul>
             </div>
         """, unsafe_allow_html=True)
         
     if not eh_pro:
         st.write("")
-        st.markdown("### 💳 Ativação do Plano PRO")
-        tab_px, tab_cc = st.tabs(["⚡ Pagamento Pix", "💳 Cartão de Crédito"])
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.subheader("💳 Ativação Segura via Mercado Pago")
+        st.write("Pague de forma 100% segura com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
         
-        with tab_px:
-            st.info("Chave Pix Oficial para ativação instantânea: financeiro@mfc.com.br (Valor: R$ 19,90)")
-            if st.button("Confirmar Pagamento Pix", use_container_width=True):
-                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
-                st.success("🎉 Pagamento confirmado! Sua conta agora é PRO.")
-                st.rerun()
-                
-        with tab_cc:
-            st.text_input("Número do Cartão", placeholder="0000 0000 0000 0000")
-            c_c1, c_c2 = st.columns(2)
-            c_c1.text_input("Validade", placeholder="MM/AA")
-            c_c2.text_input("CVV", type="password", placeholder="123")
-            if st.button("Pagar R$ 19,90 e Ativar", use_container_width=True):
-                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
-                st.success("🎉 Pagamento aprovado com sucesso! Acesso PRO liberado.")
-                st.rerun()
+        # Botão oficial com o link de checkout do Mercado Pago
+        link_mp = "[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)"
+        st.markdown(f"""
+            <a href="{link_mp}" target="_blank" class="btn-mp">
+                💳 Assinar Agora via Mercado Pago (R$ 19,90/mês)
+            </a>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
+        st.write("")
+        st.markdown("---")
+        
+        st.write("**Já realizou o pagamento no Mercado Pago?**")
+        if st.button("✅ Confirmar Pagamento e Liberar Plano PRO", use_container_width=True):
+            st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
+            st.success("🎉 Pagamento validado com sucesso! Sua conta agora é PRO.")
+            st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.markdown("""
             <div class="glass-card" style="border-color: #00e676; text-align: center; margin-top: 20px;">
