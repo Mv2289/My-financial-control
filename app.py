@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import json
 import smtplib
-import streamlit.components.v1 as components
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -103,6 +102,25 @@ st.markdown("""
         color: #000000 !important;
         transform: translateY(-1px);
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
+    }
+
+    div[data-testid="stLinkButton"] a {
+        background: #009ee3 !important;
+        color: #ffffff !important;
+        border: 1px solid #0087c2 !important;
+        border-radius: 8px !important;
+        padding: 12px 20px !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        text-align: center !important;
+        display: block !important;
+        box-shadow: 0 4px 14px rgba(0, 158, 227, 0.3) !important;
+        text-decoration: none !important;
+    }
+    div[data-testid="stLinkButton"] a:hover {
+        background: #00b0ff !important;
+        color: #ffffff !important;
+        border-color: #00b0ff !important;
     }
 
     button[data-baseweb="tab"] {
@@ -292,7 +310,6 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # Lista de Menus (Aba de Gestão exclusiva para Marcos e admin)
     opcoes_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
     if eh_master:
         opcoes_menu.append("👥 Gestão de Usuários")
@@ -444,7 +461,6 @@ elif menu_selecionado == "📊 Dashboard & Métricas":
         taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0.0
         cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
 
-        # --- CARDS KPIS ESTILO XP ---
         k1, k2, k3, k4 = st.columns(4)
         k1.markdown(f"""
             <div class="kpi-box">
@@ -598,7 +614,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO
+# ⭐ ABA 4: ASSINATURA PRO (CHECKOUT ROBUSTO)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -648,36 +664,30 @@ elif menu_selecionado == "⭐ Assinatura PRO":
         st.write("")
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         st.subheader("💳 Ativação Segura do Plano")
-        st.write("Pague de forma 100% segura com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
+        st.write("Pague com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
         
-        components.html("""
-            <div style="text-align: center; margin: 10px 0;">
-                <button onclick="window.open('[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)', '_blank')" 
-                        style="width: 100%; 
-                               background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); 
-                               color: #ffffff; 
-                               border: none; 
-                               border-radius: 8px; 
-                               padding: 14px 20px; 
-                               font-family: 'Inter', sans-serif; 
-                               font-weight: 700; 
-                               font-size: 1rem; 
-                               cursor: pointer; 
-                               box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3);
-                               transition: all 0.2s ease;">
-                    💳 Assinar Plano PRO (R$ 19,90/mês)
-                </button>
+        # Link Oficial com st.link_button validado
+        url_pagamento = "[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)"
+        st.link_button(
+            "💳 Abrir Checkout Seguro (R$ 19,90/mês)",
+            url=url_pagamento,
+            use_container_width=True
+        )
+        
+        st.markdown(f"""
+            <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:12px; font-size:0.85rem; color:#aaa;">
+                🔗 Caso o botão não abra, copie o link direto: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
             </div>
-        """, height=65)
+        """, unsafe_allow_html=True)
         
-        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 5px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
         st.write("")
         st.markdown("---")
         
         if plano_atual == "Pendente":
             st.warning("⏳ **Sua solicitação de assinatura está em análise pelo administrador.** Assim que o pagamento for verificado, seus recursos PRO serão desbloqueados.")
         else:
-            st.write("**Já realizou o pagamento pelo botão acima?**")
+            st.write("**Já realizou o pagamento pelo link acima?**")
             if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
                 st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
                 st.info("Solicitação enviada! O administrador verificará a confirmação do pagamento para liberar o acesso.")
