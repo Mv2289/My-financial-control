@@ -4,7 +4,8 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import json
 import smtplib
-import urllib.parse
+import segno
+import io
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -593,7 +594,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE EMBED SEGURO)
+# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE LOCAL SVG)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -651,15 +652,19 @@ elif menu_selecionado == "⭐ Assinatura PRO":
             st.session_state["mostrar_qr_code"] = True
             
         if st.session_state["mostrar_qr_code"]:
-            # URL pura e codificada para a API de QR Code rápida do QuickChart
-            url_enc = urllib.parse.quote_plus(url_pagamento)
-            qr_img_url = f"[https://quickchart.io/qr?text=](https://quickchart.io/qr?text=){url_enc}&size=250"
+            # Geração de QR Code nativa em SVG vetorial
+            qr = segno.make(url_pagamento, error='m')
+            buff = io.StringIO()
+            qr.save(buff, kind='svg', scale=5, dark='#08090b', light='#ffffff')
+            svg_data = buff.getvalue()
             
             c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
             with c_qr2:
                 st.markdown(f"""
-                    <div style="background:#ffffff; padding:18px; border-radius:12px; text-align:center; margin:20px 0;">
-                        <img src="{qr_img_url}" width="220" style="display:block; margin:0 auto;" alt="QR Code" />
+                    <div style="background:#ffffff; padding:18px; border-radius:12px; text-align:center; margin:20px 0; max-width:270px; margin-left:auto; margin-right:auto;">
+                        <div style="width:230px; height:230px; margin:0 auto;">
+                            {svg_data}
+                        </div>
                         <p style="color:#08090b; font-weight:700; margin:12px 0 0 0; font-size:0.9rem;">
                             Aponte a câmera do celular para pagar
                         </p>
