@@ -424,7 +424,7 @@ if menu_selecionado == "📥 Upload de Extratos":
 # ==========================================
 # 📊 ABA 2: DASHBOARD & MÉTRICAS
 # ==========================================
-elif menu_selecionado == "📊 Dashboard & MétICAS":
+elif menu_selecionado == "📊 Dashboard & Métricas":
     df_raw = pd.DataFrame(st.session_state["transacoes"])
     
     if df_raw.empty:
@@ -435,14 +435,17 @@ elif menu_selecionado == "📊 Dashboard & MétICAS":
             </div>
         """, unsafe_allow_html=True)
     else:
-        df_raw["valor"] = pd.to_numeric(df_raw["valor"])
+        df_raw["valor"] = pd.to_numeric(df_raw["valor"], errors="coerce").fillna(0.0)
         df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
         df_raw = df_raw.sort_values(by="data_dt", ascending=False)
         
-        total_entradas = float(df_raw[df_raw["tipo"] == "Receita"]["valor"].sum())
-        total_saidas = float(df_raw[df_raw["tipo"] == "Despesa"]["valor"].sum())
+        df_rec = df_raw[df_raw["tipo"] == "Receita"]
+        df_des = df_raw[df_raw["tipo"] == "Despesa"]
+        
+        total_entradas = float(df_rec["valor"].sum())
+        total_saidas = float(df_des["valor"].sum())
         saldo_liquido = total_entradas - total_saidas
-        taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0.0
+        taxa_poupanca = ((saldo_liquido / total_entradas) * 100.0) if total_entradas > 0 else 0.0
         cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
 
         k1, k2, k3, k4 = st.columns(4)
@@ -481,19 +484,17 @@ elif menu_selecionado == "📊 Dashboard & MétICAS":
         
         with c_tab:
             st.markdown("### 📋 Lançamentos Conciliados")
-            df_table = df_raw.copy()
-            df_table["valor_num"] = df_table.apply(lambda r: r["valor"] if r["tipo"] == "Receita" else -r["valor"], axis=1)
-            
-            df_render = df_table[["data", "descricao", "tipo", "valor_num"]].rename(
-                columns={"data": "Data", "descricao": "Descrição", "tipo": "Tipo", "valor_num": "Valor"}
-            )
+            df_render = df_raw[["data", "descricao", "tipo", "valor"]].copy()
             
             st.dataframe(
                 df_render,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Valor": st.column_config.NumberColumn(
+                    "data": "Data",
+                    "descricao": "Descrição",
+                    "tipo": "Tipo",
+                    "valor": st.column_config.NumberColumn(
                         "Valor (R$)",
                         format="R$ %.2f"
                     )
@@ -592,7 +593,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE VIA HTML DIRETO)
+# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE EMBED SEGURO)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -650,14 +651,15 @@ elif menu_selecionado == "⭐ Assinatura PRO":
             st.session_state["mostrar_qr_code"] = True
             
         if st.session_state["mostrar_qr_code"]:
-            url_encoded = urllib.parse.quote_plus(url_pagamento)
-            qr_api_url = f"[https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=](https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=){url_encoded}&bgcolor=ffffff&color=08090b&margin=10"
+            # URL pura e codificada para a API de QR Code rápida do QuickChart
+            url_enc = urllib.parse.quote_plus(url_pagamento)
+            qr_img_url = f"[https://quickchart.io/qr?text=](https://quickchart.io/qr?text=){url_enc}&size=250"
             
             c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
             with c_qr2:
                 st.markdown(f"""
                     <div style="background:#ffffff; padding:18px; border-radius:12px; text-align:center; margin:20px 0;">
-                        <img src="{qr_api_url}" width="230" style="display:block; margin:0 auto;" />
+                        <img src="{qr_img_url}" width="220" style="display:block; margin:0 auto;" alt="QR Code" />
                         <p style="color:#08090b; font-weight:700; margin:12px 0 0 0; font-size:0.9rem;">
                             Aponte a câmera do celular para pagar
                         </p>
