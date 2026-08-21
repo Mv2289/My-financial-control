@@ -12,7 +12,6 @@ from pypdf import PdfReader
 
 st.set_page_config(
     page_title="MFC | My Financial Control",
-    page_icon="⚜️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
