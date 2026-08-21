@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import json
 import smtplib
+import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -104,25 +105,6 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
     }
 
-    div[data-testid="stLinkButton"] a {
-        background: #009ee3 !important;
-        color: #ffffff !important;
-        border: 1px solid #0087c2 !important;
-        border-radius: 8px !important;
-        padding: 12px 20px !important;
-        font-weight: 700 !important;
-        font-size: 1rem !important;
-        text-align: center !important;
-        display: block !important;
-        box-shadow: 0 4px 14px rgba(0, 158, 227, 0.3) !important;
-        text-decoration: none !important;
-    }
-    div[data-testid="stLinkButton"] a:hover {
-        background: #00b0ff !important;
-        color: #ffffff !important;
-        border-color: #00b0ff !important;
-    }
-
     button[data-baseweb="tab"] {
         color: #888888 !important;
         font-weight: 600 !important;
@@ -214,6 +196,8 @@ if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = ""
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
+if "mostrar_qr_code" not in st.session_state:
+    st.session_state["mostrar_qr_code"] = False
 
 # --- TELA DE LOGIN INSTITUCIONAL ---
 def tela_autenticacao():
@@ -608,7 +592,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (LINK ATUALIZADO)
+# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE NA TELA)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -657,31 +641,44 @@ elif menu_selecionado == "⭐ Assinatura PRO":
     if not eh_pro:
         st.write("")
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.subheader("💳 Ativação Segura do Plano")
-        st.write("Pague com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
+        st.subheader("💳 Ativação do Plano PRO")
+        st.write("Efetue o pagamento de **R$ 19,90/mês** via Pix, Cartão ou Débito:")
         
         url_pagamento = "[https://mpago.la/2WHmRXN](https://mpago.la/2WHmRXN)"
         
-        st.link_button(
-            "💳 Abrir Checkout Seguro (R$ 19,90/mês)",
-            url=url_pagamento,
-            use_container_width=True
-        )
+        if st.button("📱 Gerar QR Code para Assinar", use_container_width=True):
+            st.session_state["mostrar_qr_code"] = True
+            
+        if st.session_state["mostrar_qr_code"]:
+            url_encoded = urllib.parse.quote_plus(url_pagamento)
+            qr_api_url = f"[https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=](https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=){url_encoded}&bgcolor=ffffff&color=08090b&margin=10"
+            
+            c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
+            with c_qr2:
+                st.markdown("""
+                    <div style="background:#ffffff; padding:15px; border-radius:12px; text-align:center; margin:20px 0;">
+                """, unsafe_allow_html=True)
+                st.image(qr_api_url, width=250)
+                st.markdown("""
+                        <p style="color:#08090b; font-weight:700; margin:5px 0 0 0; font-size:0.9rem;">
+                            Aponte a câmera do seu celular para assinar
+                        </p>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+            st.markdown(f"""
+                <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:10px; font-size:0.85rem; color:#aaa; text-align:center;">
+                    🔗 Ou acesse o link direto no computador: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
+                </div>
+            """, unsafe_allow_html=True)
         
-        st.markdown(f"""
-            <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:12px; font-size:0.85rem; color:#aaa;">
-                🔗 Link direto alternativo: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
         st.write("")
         st.markdown("---")
         
         if plano_atual == "Pendente":
             st.warning("⏳ Sua solicitação de assinatura está em análise pelo administrador.")
         else:
-            st.write("**Já realizou o pagamento pelo link acima?**")
+            st.write("**Já realizou o pagamento pelo QR Code ou Link acima?**")
             if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
                 st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
                 st.info("Solicitação enviada para verificação!")
