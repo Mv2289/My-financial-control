@@ -104,24 +104,23 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
     }
 
-    .btn-mp {
-        display: block;
-        text-align: center;
-        background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%);
+    div[data-testid="stLinkButton"] > a {
+        background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%) !important;
         color: #ffffff !important;
-        text-decoration: none;
-        font-weight: 700;
-        padding: 14px 20px;
-        border-radius: 8px;
-        letter-spacing: 0.5px;
-        font-size: 1rem;
-        box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        margin: 15px 0;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 14px 20px !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        letter-spacing: 0.5px !important;
+        text-align: center !important;
+        box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3) !important;
+        display: block !important;
     }
-    .btn-mp:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 158, 227, 0.5);
+    div[data-testid="stLinkButton"] > a:hover {
+        background: linear-gradient(135deg, #00b0ff 0%, #009ee3 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(0, 158, 227, 0.5) !important;
     }
 
     button[data-baseweb="tab"] {
@@ -149,6 +148,18 @@ st.markdown("""
         background: rgba(212, 175, 55, 0.15);
         color: #d4af37;
         border: 1px solid #d4af37;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        letter-spacing: 1px;
+        display: inline-block;
+    }
+
+    .pending-tag {
+        background: rgba(255, 193, 7, 0.15);
+        color: #ffc107;
+        border: 1px solid #ffc107;
         font-size: 0.72rem;
         font-weight: 700;
         padding: 3px 10px;
@@ -190,7 +201,7 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
             return False, f"Erro no envio do e-mail: {e}"
     return True, "(Configure credenciais no Secrets para disparo real)."
 
-# --- BANCO DE DADOS & SESSÃO (MARCOS DEFINIDO COMO GRATUITO PARA TESTE) ---
+# --- BANCO DE DADOS & SESSÃO ---
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
@@ -282,7 +293,12 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
+    if eh_pro:
+        badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>'
+    elif plano_atual == "Pendente":
+        badge_html = '<span class="pending-tag">⏳ PAGAMENTO EM ANÁLISE</span>'
+    else:
+        badge_html = '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
     
     st.markdown(f"""
         <div style="background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;">
@@ -304,14 +320,15 @@ with st.sidebar:
     if usuario_atual == "admin":
         with st.expander("🛡️ Gestão de Usuários (Admin)"):
             for u, dados in list(st.session_state["usuarios_db"].items()):
-                st.write(f"**{u}** ({dados['plano']})")
+                st.write(f"**{u}** — *{dados['plano']}*")
                 c_a1, c_a2 = st.columns(2)
-                if dados["plano"] == "Gratuito":
-                    if c_a1.button("Virar Pro", key=f"ad_pro_{u}"):
+                if dados["plano"] != "Pro":
+                    if c_a1.button("Aprovar PRO", key=f"ad_pro_{u}"):
                         st.session_state["usuarios_db"][u]["plano"] = "Pro"
+                        st.success(f"{u} agora é PRO!")
                         st.rerun()
                 else:
-                    if u != "admin" and c_a2.button("Downgrade", key=f"ad_down_{u}"):
+                    if u != "admin" and c_a2.button("Tornar Grátis", key=f"ad_down_{u}"):
                         st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
                         st.rerun()
         st.markdown("---")
@@ -613,7 +630,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (INTEGRADA AO MERCADO PAGO)
+# ⭐ ABA 4: ASSINATURA PRO (CHECKOUT INSTITUCIONAL)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -662,26 +679,28 @@ elif menu_selecionado == "⭐ Assinatura PRO":
     if not eh_pro:
         st.write("")
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.subheader("💳 Ativação Segura via Mercado Pago")
+        st.subheader("💳 Ativação Segura do Plano")
         st.write("Pague de forma 100% segura com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
         
-        # Botão oficial com o link de checkout do Mercado Pago
-        link_mp = "[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)"
-        st.markdown(f"""
-            <a href="{link_mp}" target="_blank" class="btn-mp">
-                💳 Assinar Agora via Mercado Pago (R$ 19,90/mês)
-            </a>
-        """, unsafe_allow_html=True)
+        # Botão Nativo sem menção externa
+        st.link_button(
+            "💳 Assinar Plano PRO (R$ 19,90/mês)",
+            url="[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)",
+            use_container_width=True
+        )
         
-        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
         st.write("")
         st.markdown("---")
         
-        st.write("**Já realizou o pagamento no Mercado Pago?**")
-        if st.button("✅ Confirmar Pagamento e Liberar Plano PRO", use_container_width=True):
-            st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
-            st.success("🎉 Pagamento validado com sucesso! Sua conta agora é PRO.")
-            st.rerun()
+        if plano_atual == "Pendente":
+            st.warning("⏳ **Sua solicitação de assinatura está em análise pelo administrador.** Assim que o pagamento for verificado, seus recursos PRO serão desbloqueados.")
+        else:
+            st.write("**Já realizou o pagamento pelo link acima?**")
+            if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
+                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
+                st.info("Solicitação enviada! O administrador verificará a confirmação do pagamento para liberar o acesso.")
+                st.rerun()
             
         st.markdown('</div>', unsafe_allow_html=True)
     else:
