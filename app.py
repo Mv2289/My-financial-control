@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import json
 import smtplib
-import segno
+import mercadopago
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -18,36 +18,6 @@ st.set_page_config(
 # Estilo institucional XP
 css_style = "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'); html, body, [class*='css'], .stApp { font-family: 'Inter', sans-serif !important; background-color: #08090b !important; color: #e5e5e5 !important; } section[data-testid='stSidebar'] { background-color: #0d0f14 !important; border-right: 1px solid rgba(212, 175, 55, 0.12) !important; } .brand-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 2px; color: #d4af37; margin: 0; line-height: 1; text-align: center; } .brand-subtitle { font-size: 0.78rem; letter-spacing: 4px; text-transform: uppercase; color: #9e9575; margin-top: 4px; font-weight: 600; text-align: center; margin-bottom: 20px; } .glass-card { background: rgba(18, 20, 26, 0.7); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 14px; padding: 24px; margin-bottom: 20px; } .kpi-box { background: #0f1117; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 20px; text-align: center; } .kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a89f81; margin-bottom: 6px; } .kpi-val { font-size: 1.7rem; font-weight: 800; margin: 0; } div.stButton > button { background: #d4af37 !important; color: #08090b !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; padding: 10px 20px !important; font-weight: 700 !important; } div.stButton > button:hover { background: #e6c35c !important; border-color: #e6c35c !important; color: #000000 !important; } .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; }</style>"
 st.markdown(css_style, unsafe_allow_html=True)
-
-# Gerador de Payload Pix BACEN
-def gerar_payload_pix(chave_pix, nome_titular, cidade_titular, valor=19.90, txid="MFCPRO"):
-    def tlv(tag, valor_str):
-        return f"{tag}{len(valor_str):02d}{valor_str}"
-
-    merchant_account = tlv("00", "br.gov.bcb.pix") + tlv("01", chave_pix)
-    payload = (
-        tlv("00", "01") +
-        tlv("26", merchant_account) +
-        tlv("52", "0000") +
-        tlv("53", "986") +
-        tlv("54", f"{valor:.2f}") +
-        tlv("58", "BR") +
-        tlv("59", nome_titular[:25].upper()) +
-        tlv("60", cidade_titular[:15].upper()) +
-        tlv("62", tlv("05", txid[:25])) +
-        "6304"
-    )
-
-    crc = 0xFFFF
-    for char in payload:
-        crc ^= ord(char) << 8
-        for _ in range(8):
-            if crc & 0x8000:
-                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
-            else:
-                crc = (crc << 1) & 0xFFFF
-                
-    return payload + f"{crc:04X}"
 
 # Disparo de e-mail institucional
 def enviar_email_boas_vindas(destinatario_email, nome_usuario):
@@ -69,6 +39,34 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
             return False, f"Erro: {e}"
     return True, ""
 
+# Funções da API Mercado Pago para Pix Automático
+def criar_cobranca_pix(access_token, email_cliente, nome_cliente, valor=19.90):
+    sdk = mercadopago.SDK(access_token)
+    primeiro_nome = nome_cliente.split()[0] if nome_cliente else "Cliente"
+    payment_data = {
+        "transaction_amount": float(valor),
+        "description": "MFC Assinatura PRO - Mensal",
+        "payment_method_id": "pix",
+        "payer": {
+            "email": email_cliente if ("@" in email_cliente and "." in email_cliente) else "contato@mfc.com",
+            "first_name": primeiro_nome
+        }
+    }
+    payment_response = sdk.payment().create(payment_data)
+    payment = payment_response.get("response", {})
+    
+    qr_base64 = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code_base64", "")
+    qr_copia_cola = payment.get("point_of_interaction", {}).get("transaction_data", {}).get("qr_code", "")
+    payment_id = payment.get("id")
+    
+    return payment_id, qr_base64, qr_copia_cola
+
+def checar_status_pagamento(access_token, payment_id):
+    sdk = mercadopago.SDK(access_token)
+    payment_response = sdk.payment().get(payment_id)
+    payment = payment_response.get("response", {})
+    return payment.get("status", "pending")
+
 # Banco de dados e sessão
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
@@ -82,10 +80,14 @@ if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = ""
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
-if "mostrar_qr_code" not in st.session_state:
-    st.session_state["mostrar_qr_code"] = False
+if "pix_payment_id" not in st.session_state:
+    st.session_state["pix_payment_id"] = None
+if "pix_qr_base64" not in st.session_state:
+    st.session_state["pix_qr_base64"] = ""
+if "pix_copia_cola" not in st.session_state:
+    st.session_state["pix_copia_cola"] = ""
 
-# Tela de Login
+# Tela de Autenticação
 def tela_autenticacao():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -147,12 +149,13 @@ eh_pro = (plano_atual == "Pro")
 user_email = dados_usuario.get("email", "")
 eh_master = (usuario_atual in ["Marcos", "admin"])
 api_key = st.secrets.get("GEMINI_API_KEY", "")
+mp_access_token = st.secrets.get("MP_ACCESS_TOKEN", "")
 
 # Barra Lateral
 with st.sidebar:
     st.markdown("<div style='padding: 10px 0 20px 0; text-align: center;'><div class='brand-title' style='font-size: 2.2rem;'>MFC</div><div class='brand-subtitle' style='font-size: 0.65rem;'>MY FINANCIAL CONTROL</div></div>", unsafe_allow_html=True)
     
-    badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else ('<span class="pending-tag">⏳ PAGAMENTO EM ANÁLISE</span>' if plano_atual == "Pendente" else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>')
+    badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
     st.markdown(f"<div style='background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;'><div style='font-size: 0.72rem; color: #777; text-transform: uppercase;'>Usuário</div><div style='font-weight: 700; font-size: 1.05rem; color: #ffffff;'>{usuario_atual}</div><div style='font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;'>{user_email}</div>{badge_html}</div>", unsafe_allow_html=True)
     
     opcoes_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
@@ -326,7 +329,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos superam o teto.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO
+# ⭐ ABA 4: ASSINATURA PRO (LIBERAÇÃO AUTOMÁTICA)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("<div style='text-align: center; margin-bottom: 30px;'><div class='brand-title' style='font-size: 2.2rem;'>MFC PRO</div><p style='color: #888; font-size: 0.95rem; margin-top: 4px;'>Eleve o seu controle patrimonial</p></div>", unsafe_allow_html=True)
@@ -341,37 +344,45 @@ elif menu_selecionado == "⭐ Assinatura PRO":
     if not eh_pro:
         st.write("")
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.subheader("💳 Ativação Instantânea via Pix")
-        st.write("Valor da assinatura mensal: **R$ 19,90**")
+        st.subheader("💳 Ativação Instantânea com Liberação Automática")
+        st.write("Valor da assinatura mensal: **R$ 19,90** (Pix)")
         
-        chave_pix = "cf58d39f-09f1-4134-9b18-7fc86045ce49"
-        nome_titular = "MARCOS VINICIUS"
-        cidade_titular = "CURITIBA"
+        if not mp_access_token:
+            st.info("💡 Configure seu `MP_ACCESS_TOKEN` do Mercado Pago nos Secrets para habilitar a aprovação 100% automática.")
         
         if st.button("📱 Gerar QR Code Pix (R$ 19,90)", use_container_width=True):
-            st.session_state["mostrar_qr_code"] = True
+            if mp_access_token:
+                with st.spinner("Gerando cobrança Pix oficial..."):
+                    pid, qrb64, copia_cola = criar_cobranca_pix(mp_access_token, user_email, usuario_atual, 19.90)
+                    if qrb64:
+                        st.session_state["pix_payment_id"] = pid
+                        st.session_state["pix_qr_base64"] = qrb64
+                        st.session_state["pix_copia_cola"] = copia_cola
+                    else:
+                        st.error("Erro ao comunicar com Mercado Pago. Verifique o token nos Secrets.")
+            else:
+                st.warning("Adicione MP_ACCESS_TOKEN nos Secrets para gerar cobranças dinâmicas.")
             
-        if st.session_state["mostrar_qr_code"]:
-            payload_pix = gerar_payload_pix(chave_pix, nome_titular, cidade_titular, valor=19.90)
-            qr = segno.make(payload_pix, error='m')
-            svg_uri = qr.svg_data_uri(scale=6, dark='#08090b', light='#ffffff')
-            
+        if st.session_state["pix_qr_base64"]:
             c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
             with c_qr2:
-                st.markdown(f"<div style='background:#ffffff; padding:20px; border-radius:14px; text-align:center; margin:20px 0; max-width:280px; margin-left:auto; margin-right:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);'><img src='{svg_uri}' width='220' style='display:block; margin:0 auto;' alt='QR Code Pix' /></div>", unsafe_allow_html=True)
-        
-        st.write("")
-        st.markdown("---")
-        
-        if plano_atual == "Pendente":
-            st.warning("⏳ Sua solicitação de assinatura está em análise pelo administrador.")
-        else:
-            st.write("**Já realizou o pagamento pelo QR Code Pix?**")
-            if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
-                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
-                st.info("Solicitação enviada para verificação!")
-                st.rerun()
-            
+                st.markdown(f"<div style='background:#ffffff; padding:20px; border-radius:14px; text-align:center; margin:20px 0; max-width:280px; margin-left:auto; margin-right:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);'><img src='data:image/png;base64,{st.session_state['pix_qr_base64']}' width='220' style='display:block; margin:0 auto;' alt='QR Code Pix' /></div>", unsafe_allow_html=True)
+                
+            # Verificação automática em tempo real
+            if st.session_state["pix_payment_id"] and mp_access_token:
+                status = checar_status_pagamento(mp_access_token, st.session_state["pix_payment_id"])
+                if status == "approved":
+                    st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
+                    st.session_state["pix_qr_base64"] = ""
+                    st.session_state["pix_payment_id"] = None
+                    st.balloons()
+                    st.success("🎉 Pagamento confirmado com sucesso! Seu Plano PRO foi liberado.")
+                    st.rerun()
+                else:
+                    st.info("⏳ Aguardando pagamento... Assim que você pagar no app do seu banco, o acesso é liberado sozinho.")
+                    if st.button("🔄 Atualizar Status Manualmente"):
+                        st.rerun()
+
         st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div class='glass-card' style='border-color: #00e676; text-align: center; margin-top: 20px;'><h3 style='color: #00e676 !important; margin: 0;'>✔ Assinatura PRO Ativa</h3><p style='color: #aaa; margin: 5px 0 0 0;'>Você possui acesso a todos os recursos ilimitados do MFC.</p></div>", unsafe_allow_html=True)
