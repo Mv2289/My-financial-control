@@ -174,7 +174,7 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
-        "Marcos": {"email": "marcos@mfc.com", "senha": "123", "plano": "Pro"}
+        "Marcos": {"email": "marcos@mfc.com", "senha": "1234", "plano": "Pro"}
     }
 
 if "autenticado" not in st.session_state:
@@ -184,18 +184,17 @@ if "usuario_logado" not in st.session_state:
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
 
-# --- TELA DE LOGIN INSTITUCIONAL ---
+# --- TELA DE LOGIN INSTITUCIONAL (LIMPA E DIRETA) ---
 def tela_autenticacao():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         st.markdown("""
-            <div style="text-align: center; margin: 40px 0 25px 0;">
+            <div style="text-align: center; margin: 40px 0 20px 0;">
                 <div class="brand-title">MFC</div>
                 <div class="brand-subtitle">MY FINANCIAL CONTROL</div>
             </div>
         """, unsafe_allow_html=True)
         
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         aba_login, aba_cadastro = st.tabs(["🔑 Acessar", "✨ Criar Conta"])
         
         with aba_login:
@@ -204,10 +203,16 @@ def tela_autenticacao():
             senha = st.text_input("Senha", type="password", key="login_pass")
             st.write("")
             if st.button("Entrar no Painel", use_container_width=True):
-                if usuario in st.session_state["usuarios_db"] and st.session_state["usuarios_db"][usuario]["senha"] == senha:
-                    st.session_state["autenticado"] = True
-                    st.session_state["usuario_logado"] = usuario
-                    st.rerun()
+                user_clean = usuario.strip()
+                # Verifica usuário e senha (compatível com '1234' e '123' para Marcos)
+                if user_clean in st.session_state["usuarios_db"]:
+                    senha_cadastrada = st.session_state["usuarios_db"][user_clean]["senha"]
+                    if senha == senha_cadastrada or (user_clean == "Marcos" and senha in ["1234", "123"]):
+                        st.session_state["autenticado"] = True
+                        st.session_state["usuario_logado"] = user_clean
+                        st.rerun()
+                    else:
+                        st.error("Credenciais inválidas.")
                 else:
                     st.error("Credenciais inválidas.")
                     
@@ -235,8 +240,6 @@ def tela_autenticacao():
                     }
                     _, msg_email = enviar_email_boas_vindas(novo_email, novo_usuario)
                     st.success(f"Conta registrada com sucesso! {msg_email}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
