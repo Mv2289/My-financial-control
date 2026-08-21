@@ -16,13 +16,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILO INSTITUCIONAL XP INVESTIMENTOS (DARK & GOLD MINIMALIST) ---
+# --- ESTILO INSTITUCIONAL (XP / DARK & GOLD) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
     html, body, [class*="css"], .stApp {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-family: 'Inter', sans-serif !important;
         background-color: #08090b !important;
         background: radial-gradient(circle at 50% 0%, #151821 0%, #08090b 75%) fixed !important;
         color: #e5e5e5 !important;
@@ -66,11 +66,6 @@ st.markdown("""
         border-radius: 12px;
         padding: 20px;
         text-align: center;
-        transition: all 0.2s ease;
-    }
-    .kpi-box:hover {
-        border-color: rgba(212, 175, 55, 0.4);
-        transform: translateY(-2px);
     }
     .kpi-label {
         font-size: 0.78rem;
@@ -93,37 +88,19 @@ st.markdown("""
         border-radius: 8px !important;
         padding: 10px 20px !important;
         font-weight: 700 !important;
-        letter-spacing: 0.5px !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 4px 14px rgba(212, 175, 55, 0.2) !important;
     }
     div.stButton > button:hover {
         background: #e6c35c !important;
         border-color: #e6c35c !important;
-        color: #000000 !important;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
     }
 
     button[data-baseweb="tab"] {
         color: #888888 !important;
         font-weight: 600 !important;
         background-color: transparent !important;
-        border-bottom: 2px solid transparent !important;
     }
     button[aria-selected="true"] {
         color: #d4af37 !important;
-        border-bottom-color: #d4af37 !important;
-    }
-
-    input, textarea, select {
-        background-color: #12151c !important;
-        color: #ffffff !important;
-        border: 1px solid #232733 !important;
-        border-radius: 8px !important;
-    }
-    input:focus {
-        border-color: #d4af37 !important;
     }
 
     .pro-tag {
@@ -134,7 +111,6 @@ st.markdown("""
         font-weight: 700;
         padding: 3px 10px;
         border-radius: 20px;
-        letter-spacing: 1px;
         display: inline-block;
     }
 
@@ -146,44 +122,12 @@ st.markdown("""
         font-weight: 700;
         padding: 3px 10px;
         border-radius: 20px;
-        letter-spacing: 1px;
         display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÃO DE E-MAIL ---
-def enviar_email_boas_vindas(destinatario_email, nome_usuario):
-    remetente = st.secrets.get("EMAIL_REMETENTE", "")
-    senha_remetente = st.secrets.get("EMAIL_SENHA", "")
-    
-    if remetente and senha_remetente:
-        try:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "MFC | Acesso Liberado"
-            msg["From"] = f"MFC Gestão Financeira <{remetente}>"
-            msg["To"] = destinatario_email
-            
-            html = f"""
-            <div style="background-color:#08090b; color:#e5e5e5; padding:35px; border-radius:12px; border:1px solid #d4af37; font-family:'Inter', Arial, sans-serif;">
-                <h1 style="color:#d4af37; margin:0; font-size:26px;">MFC</h1>
-                <p style="color:#9e9575; font-size:11px; letter-spacing:3px; margin:0 0 20px 0;">MY FINANCIAL CONTROL</p>
-                <p style="font-size:15px; line-height:1.6; color:#ccc;">Olá <b>{nome_usuario}</b>, sua conta foi ativada com sucesso.</p>
-                <p style="font-size:14px; color:#999;">Agora você pode automatizar a conciliação dos seus extratos bancários com precisão institucional.</p>
-                <br>
-                <small style="color:#555;">MFC • Plataforma de Gestão Financeira</small>
-            </div>
-            """
-            msg.attach(MIMEText(html, "html"))
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-                servidor.login(remetente, senha_remetente)
-                servidor.sendmail(remetente, destinatario_email, msg.as_string())
-            return True, "E-mail de confirmação enviado."
-        except Exception as e:
-            return False, f"Erro no envio do e-mail: {e}"
-    return True, "(Configure credenciais no Secrets para disparo real)."
-
-# --- BANCO DE DADOS & SESSÃO ---
+# --- SESSÃO & CONTROLE DE USUÁRIOS ---
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
@@ -196,10 +140,10 @@ if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = ""
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
-if "mostrar_qr_code" not in st.session_state:
-    st.session_state["mostrar_qr_code"] = False
+if "mostrar_qr" not in st.session_state:
+    st.session_state["mostrar_qr"] = False
 
-# --- TELA DE LOGIN INSTITUCIONAL ---
+# --- TELA DE LOGIN ---
 def tela_autenticacao():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -210,63 +154,56 @@ def tela_autenticacao():
             </div>
         """, unsafe_allow_html=True)
         
-        aba_login, aba_cadastro = st.tabs(["🔑 Acessar", "✨ Criar Conta"])
+        tab1, tab2 = st.tabs(["🔑 Acessar", "✨ Criar Conta"])
         
-        with aba_login:
+        with tab1:
             st.write("")
-            usuario = st.text_input("Usuário", key="login_user")
-            senha = st.text_input("Senha", type="password", key="login_pass")
+            u = st.text_input("Usuário", key="u_login")
+            s = st.text_input("Senha", type="password", key="s_login")
             st.write("")
-            if st.button("Entrar no Painel", use_container_width=True):
-                user_clean = usuario.strip()
-                if user_clean in st.session_state["usuarios_db"]:
-                    senha_cadastrada = st.session_state["usuarios_db"][user_clean]["senha"]
-                    if senha == senha_cadastrada or (user_clean == "Marcos" and senha in ["1234", "123"]):
+            if st.button("Entrar", use_container_width=True):
+                u_clean = u.strip()
+                db = st.session_state["usuarios_db"]
+                if u_clean in db:
+                    correta = db[u_clean]["senha"]
+                    if s == correta or (u_clean == "Marcos" and s in ["1234", "123"]):
                         st.session_state["autenticado"] = True
-                        st.session_state["usuario_logado"] = user_clean
+                        st.session_state["usuario_logado"] = u_clean
                         st.rerun()
                     else:
                         st.error("Credenciais inválidas.")
                 else:
                     st.error("Credenciais inválidas.")
                     
-        with aba_cadastro:
+        with tab2:
             st.write("")
-            novo_usuario = st.text_input("Nome de Usuário", key="cad_user")
-            novo_email = st.text_input("E-mail", placeholder="seu@email.com", key="cad_email")
-            nova_senha = st.text_input("Senha", type="password", key="cad_pass")
-            confirma_senha = st.text_input("Confirmar Senha", type="password", key="cad_pass_conf")
+            nu = st.text_input("Nome de Usuário", key="u_cad")
+            ne = st.text_input("E-mail", key="e_cad")
+            ns = st.text_input("Senha", type="password", key="s_cad")
             st.write("")
             if st.button("Cadastrar", use_container_width=True):
-                if not novo_usuario or not novo_email or not nova_senha:
+                if not nu or not ne or not ns:
                     st.warning("Preencha todos os campos.")
-                elif "@" not in novo_email or "." not in novo_email:
-                    st.error("Insira um e-mail válido.")
-                elif novo_usuario in st.session_state["usuarios_db"]:
-                    st.error("Este nome de usuário já existe.")
-                elif nova_senha != confirma_senha:
-                    st.error("As senhas não coincidem.")
+                elif nu in st.session_state["usuarios_db"]:
+                    st.error("Usuário já existente.")
                 else:
-                    st.session_state["usuarios_db"][novo_usuario] = {
-                        "email": novo_email,
-                        "senha": nova_senha,
+                    st.session_state["usuarios_db"][nu] = {
+                        "email": ne,
+                        "senha": ns,
                         "plano": "Gratuito"
                     }
-                    _, msg_email = enviar_email_boas_vindas(novo_email, novo_usuario)
-                    st.success(f"Conta registrada com sucesso! {msg_email}")
+                    st.success("Conta criada com sucesso!")
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
 
-# --- USUÁRIO E PLANO ---
+# --- DADOS DO USUÁRIO ---
 usuario_atual = st.session_state.get("usuario_logado", "")
-dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito", "email": ""})
-plano_atual = dados_usuario.get("plano", "Gratuito")
+dados_user = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito", "email": ""})
+plano_atual = dados_user.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
-user_email = dados_usuario.get("email", "")
 eh_master = (usuario_atual in ["Marcos", "admin"])
-
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
 # --- BARRA LATERAL ---
@@ -278,36 +215,33 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    if eh_pro:
-        badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>'
-    elif plano_atual == "Pendente":
-        badge_html = '<span class="pending-tag">⏳ PAGAMENTO EM ANÁLISE</span>'
-    else:
-        badge_html = '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
+    badge = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else (
+        '<span class="pending-tag">⏳ EM ANÁLISE</span>' if plano_atual == "Pendente" else 
+        '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
+    )
     
     st.markdown(f"""
         <div style="background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;">
             <div style="font-size: 0.72rem; color: #777; text-transform: uppercase;">Usuário</div>
             <div style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">{usuario_atual}</div>
-            <div style="font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;">{user_email}</div>
-            {badge_html}
+            <div style="font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;">{dados_user.get('email','')}</div>
+            {badge}
         </div>
     """, unsafe_allow_html=True)
     
-    opcoes_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
+    itens_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
     if eh_master:
-        opcoes_menu.append("👥 Gestão de Usuários")
+        itens_menu.append("👥 Gestão de Usuários")
         
-    menu_selecionado = st.radio("Menu", opcoes_menu, label_visibility="collapsed")
-    
+    menu_sel = st.radio("Menu", itens_menu, label_visibility="collapsed")
     st.markdown("---")
-        
+    
     if not api_key:
-        with st.expander("⚙️ Chave de Integração"):
-            api_key = st.text_input("Chave de Acesso", type="password")
+        with st.expander("⚙️ Integração"):
+            api_key = st.text_input("Chave", type="password")
 
     if st.session_state["transacoes"]:
-        if st.button("🗑️ Limpar Dados Atuais", use_container_width=True):
+        if st.button("🗑️ Limpar Dados", use_container_width=True):
             st.session_state["transacoes"] = []
             st.rerun()
 
@@ -316,128 +250,72 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# --- MOTOR DE CONCILIAÇÃO MFC ---
-def processar_extrato_pdf(file, chave_api):
-    reader = PdfReader(file)
-    texto_extrato = ""
-    for page in reader.pages:
-        texto_extrato += page.extract_text() or ""
-        
-    if not texto_extrato.strip():
-        raise Exception("Não foi possível extrair texto do PDF. O arquivo pode estar protegido ou ser imagem escaneada.")
+# --- MOTOR DE LEITURA IA ---
+def processar_pdf(arquivo, key):
+    reader = PdfReader(arquivo)
+    txt = ""
+    for p in reader.pages:
+        txt += p.extract_text() or ""
+    if not txt.strip():
+        raise Exception("Texto não extraível do PDF.")
 
-    genai.configure(api_key=chave_api)
-    
-    modelos_disponiveis = []
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                modelos_disponiveis.append(m.name)
-    except Exception:
-        pass
-    
-    preferencias = [
-        "models/gemini-2.5-flash",
-        "models/gemini-2.0-flash",
-        "models/gemini-flash-latest",
-        "models/gemini-1.5-flash",
-        "models/gemini-pro"
-    ]
-    candidatos = [m for m in preferencias if m in modelos_disponiveis] or modelos_disponiveis or ["gemini-2.5-flash"]
-
+    genai.configure(api_key=key)
     prompt = f"""
-    Você é o motor de conciliação financeira do MFC (My Financial Control). Analise o extrato abaixo e extraia rigorosamente todas as movimentações.
-    Retorne EXCLUSIVAMENTE um array JSON contendo objetos no formato:
-    - "data": string (DD/MM/AAAA)
-    - "descricao": string (nome claro da transação, pessoa, banco ou comércio)
-    - "tipo": string ("Receita" ou "Despesa")
-    - "valor": float (valor numérico positivo com ponto, ex: 150.50)
-
+    Extraia do extrato bancário as transações e responda EXCLUSIVAMENTE em JSON:
+    [
+        {{"data": "DD/MM/AAAA", "descricao": "Nome", "tipo": "Receita" ou "Despesa", "valor": 123.45}}
+    ]
     EXTRATO:
-    {texto_extrato}
+    {txt}
     """
-    
-    response = None
-    ultimo_erro = None
-    for modelo in candidatos:
-        try:
-            m = genai.GenerativeModel(model_name=modelo, generation_config={"response_mime_type": "application/json"})
-            response = m.generate_content(prompt)
-            if response and response.text:
-                break
-        except Exception as e:
-            ultimo_erro = e
-            continue
-            
-    if not response:
-        raise ultimo_erro
-        
-    res_text = response.text.strip()
-    if res_text.startswith("```json"):
-        res_text = res_text[7:]
-    if res_text.startswith("```"):
-        res_text = res_text[3:]
-    if res_text.endswith("```"):
-        res_text = res_text[:-3]
-    return json.loads(res_text.strip())
+    m = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config={"response_mime_type": "application/json"})
+    r = m.generate_content(prompt)
+    raw = r.text.strip()
+    if raw.startswith("```json"):
+        raw = raw[7:]
+    if raw.startswith("```"):
+        raw = raw[3:]
+    if raw.endswith("```"):
+        raw = raw[:-3]
+    return json.loads(raw.strip())
 
 # ==========================================
 # 📥 ABA 1: UPLOAD DE EXTRATOS
 # ==========================================
-if menu_selecionado == "📥 Upload de Extratos":
+if menu_sel == "📥 Upload de Extratos":
     st.markdown("""
         <div class="glass-card">
             <h2 style="margin:0; color:#d4af37;">📥 Importação de Extratos Bancários</h2>
-            <p style="color:#aaa; font-size:0.95rem; margin-top:6px;">
-                Carregue seus extratos em PDF (PicPay, Nubank, Itaú, Bradesco, etc.) para conciliação automática.
-            </p>
+            <p style="color:#aaa; font-size:0.95rem; margin-top:6px;">Carregue extratos em PDF para conciliação automática.</p>
         </div>
     """, unsafe_allow_html=True)
     
     if eh_pro:
-        st.markdown("##### 🌟 Upload Multi-Arquivos (PRO)")
-        arquivos = st.file_uploader("Selecione um ou vários PDFs", type=["pdf"], accept_multiple_files=True)
+        st.markdown("##### 🌟 Multi-Arquivos (PRO)")
+        arqs = st.file_uploader("Selecione os PDFs", type=["pdf"], accept_multiple_files=True)
     else:
-        st.markdown("##### 📄 Upload Individual (Plano Básico)")
-        arquivo_unico = st.file_uploader("Selecione o extrato em PDF", type=["pdf"], accept_multiple_files=False)
-        arquivos = [arquivo_unico] if arquivo_unico else []
+        st.markdown("##### 📄 Arquivo Individual (Básico)")
+        ar_un = st.file_uploader("Selecione o PDF", type=["pdf"], accept_multiple_files=False)
+        arqs = [ar_un] if ar_un else []
         
     st.write("")
-    if arquivos and st.button("🚀 Processar e Conciliar Extratos", use_container_width=True):
+    if arqs and st.button("🚀 Processar Extratos", use_container_width=True):
         if not api_key:
-            st.error("Chave de acesso não configurada. Salve nos Secrets do Streamlit ou na barra lateral.")
+            st.error("Chave de API não configurada.")
         else:
-            todas_transacoes = []
-            with st.spinner("Processando extratos bancários..."):
-                for arq in arquivos:
+            lista = []
+            with st.spinner("Processando..."):
+                for a in arqs:
                     try:
-                        res = processar_extrato_pdf(arq, api_key)
-                        todas_transacoes.extend(res)
+                        res = processar_pdf(a, api_key)
+                        lista.extend(res)
                     except Exception as err:
-                        st.error(f"Erro em {arq.name}: {err}")
-                
-                if todas_transacoes:
-                    st.session_state["transacoes"].extend(todas_transacoes)
-                    st.success("✨ Sucesso! Movimentações consolidadas.")
-                    st.info("👉 Acesse a aba 📊 Dashboard & Métricas para ver a análise.")
+                        st.error(f"Erro em {a.name}: {err}")
+                if lista:
+                    st.session_state["transacoes"].extend(lista)
+                    st.success("✨ Processamento concluído com sucesso!")
 
 # ==========================================
 # 📊 ABA 2: DASHBOARD & MÉTRICAS
 # ==========================================
-elif menu_selecionado == "📊 Dashboard & Métricas":
-    df_raw = pd.DataFrame(st.session_state["transacoes"])
-    
-    if df_raw.empty:
-        st.markdown("""
-            <div class="glass-card" style="text-align:center; padding: 40px;">
-                <h3 style="color:#888;">Nenhum Extrato Importado</h3>
-                <p style="color:#666;">Faça o upload do seu primeiro PDF bancário na aba 'Upload de Extratos'.</p>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        df_raw["valor"] = pd.to_numeric(df_raw["valor"])
-        df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
-        df_raw = df_raw.sort_values(by="data_dt", ascending=False)
-        
-        total_entradas = float(df_raw[df_raw["tipo"] == "Receita"]["valor"].sum())
-        total_saidas = float(df_raw
+elif menu_sel == "📊 Dashboard & Mét
