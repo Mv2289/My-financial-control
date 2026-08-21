@@ -3,10 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
 import json
-import smtplib
 import urllib.parse
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
 
 st.set_page_config(
@@ -16,7 +13,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILO INSTITUCIONAL (XP / DARK & GOLD) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -94,15 +90,6 @@ st.markdown("""
         border-color: #e6c35c !important;
     }
 
-    button[data-baseweb="tab"] {
-        color: #888888 !important;
-        font-weight: 600 !important;
-        background-color: transparent !important;
-    }
-    button[aria-selected="true"] {
-        color: #d4af37 !important;
-    }
-
     .pro-tag {
         background: rgba(212, 175, 55, 0.15);
         color: #d4af37;
@@ -127,7 +114,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSÃO & CONTROLE DE USUÁRIOS ---
+# --- BANCO DE DADOS & SESSÃO ---
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
@@ -143,10 +130,10 @@ if "transacoes" not in st.session_state:
 if "mostrar_qr" not in st.session_state:
     st.session_state["mostrar_qr"] = False
 
-# --- TELA DE LOGIN ---
+# --- AUTENTICAÇÃO ---
 def tela_autenticacao():
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
+    c1, c2, c3 = st.columns([1, 1.2, 1])
+    with c2:
         st.markdown("""
             <div style="text-align: center; margin: 40px 0 20px 0;">
                 <div class="brand-title">MFC</div>
@@ -154,51 +141,51 @@ def tela_autenticacao():
             </div>
         """, unsafe_allow_html=True)
         
-        tab1, tab2 = st.tabs(["🔑 Acessar", "✨ Criar Conta"])
+        tab_login, tab_cad = st.tabs(["🔑 Acessar", "✨ Criar Conta"])
         
-        with tab1:
+        with tab_login:
             st.write("")
-            u = st.text_input("Usuário", key="u_login")
-            s = st.text_input("Senha", type="password", key="s_login")
+            u = st.text_input("Usuário", key="u_log")
+            s = st.text_input("Senha", type="password", key="s_log")
             st.write("")
             if st.button("Entrar", use_container_width=True):
-                u_clean = u.strip()
+                u_limpo = u.strip()
                 db = st.session_state["usuarios_db"]
-                if u_clean in db:
-                    correta = db[u_clean]["senha"]
-                    if s == correta or (u_clean == "Marcos" and s in ["1234", "123"]):
+                if u_limpo in db:
+                    s_real = db[u_limpo]["senha"]
+                    if s == s_real or (u_limpo == "Marcos" and s in ["1234", "123"]):
                         st.session_state["autenticado"] = True
-                        st.session_state["usuario_logado"] = u_clean
+                        st.session_state["usuario_logado"] = u_limpo
                         st.rerun()
                     else:
                         st.error("Credenciais inválidas.")
                 else:
                     st.error("Credenciais inválidas.")
                     
-        with tab2:
+        with tab_cad:
             st.write("")
-            nu = st.text_input("Nome de Usuário", key="u_cad")
-            ne = st.text_input("E-mail", key="e_cad")
-            ns = st.text_input("Senha", type="password", key="s_cad")
+            nu = st.text_input("Nome", key="nu_cad")
+            ne = st.text_input("E-mail", key="ne_cad")
+            ns = st.text_input("Senha", type="password", key="ns_cad")
             st.write("")
             if st.button("Cadastrar", use_container_width=True):
                 if not nu or not ne or not ns:
                     st.warning("Preencha todos os campos.")
                 elif nu in st.session_state["usuarios_db"]:
-                    st.error("Usuário já existente.")
+                    st.error("Usuário já existe.")
                 else:
                     st.session_state["usuarios_db"][nu] = {
                         "email": ne,
                         "senha": ns,
                         "plano": "Gratuito"
                     }
-                    st.success("Conta criada com sucesso!")
+                    st.success("Conta criada!")
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
 
-# --- DADOS DO USUÁRIO ---
+# --- USUARIO ATIVO ---
 usuario_atual = st.session_state.get("usuario_logado", "")
 dados_user = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito", "email": ""})
 plano_atual = dados_user.get("plano", "Gratuito")
@@ -215,10 +202,12 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    badge = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else (
-        '<span class="pending-tag">⏳ EM ANÁLISE</span>' if plano_atual == "Pendente" else 
-        '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
-    )
+    if eh_pro:
+        badge = '<span class="pro-tag">⭐ PLANO PRO</span>'
+    elif plano_atual == "Pendente":
+        badge = '<span class="pending-tag">⏳ EM ANÁLISE</span>'
+    else:
+        badge = '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
     
     st.markdown(f"""
         <div style="background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;">
@@ -229,19 +218,27 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    itens_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
+    rotas = ["Upload", "Dashboard", "Planejamento", "Assinatura"]
+    rotas_labels = {
+        "Upload": "📥 Upload de Extratos",
+        "Dashboard": "📊 Dashboard & Métricas",
+        "Planejamento": "🔮 Planejamento Futuro",
+        "Assinatura": "⭐ Assinatura PRO"
+    }
+    
     if eh_master:
-        itens_menu.append("👥 Gestão de Usuários")
+        rotas.append("Usuarios")
+        rotas_labels["Usuarios"] = "👥 Gestão de Usuários"
         
-    menu_sel = st.radio("Menu", itens_menu, label_visibility="collapsed")
+    menu_cod = st.radio("Menu", rotas, format_func=lambda x: rotas_labels[x], label_visibility="collapsed")
     st.markdown("---")
     
     if not api_key:
-        with st.expander("⚙️ Integração"):
+        with st.expander("⚙️ Chave de Acesso"):
             api_key = st.text_input("Chave", type="password")
 
     if st.session_state["transacoes"]:
-        if st.button("🗑️ Limpar Dados", use_container_width=True):
+        if st.button("🗑️ Limpar Extratos", use_container_width=True):
             st.session_state["transacoes"] = []
             st.rerun()
 
@@ -250,72 +247,63 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# --- MOTOR DE LEITURA IA ---
-def processar_pdf(arquivo, key):
+# --- PROCESSADOR PDF ---
+def extrair_movimentacoes(arquivo, chave):
     reader = PdfReader(arquivo)
-    txt = ""
-    for p in reader.pages:
-        txt += p.extract_text() or ""
-    if not txt.strip():
-        raise Exception("Texto não extraível do PDF.")
+    conteudo = ""
+    for pag in reader.pages:
+        conteudo += pag.extract_text() or ""
+        
+    if not conteudo.strip():
+        raise Exception("PDF vazio ou ilegível.")
 
-    genai.configure(api_key=key)
+    genai.configure(api_key=chave)
     prompt = f"""
-    Extraia do extrato bancário as transações e responda EXCLUSIVAMENTE em JSON:
+    Extraia as movimentações do extrato e responda EXCLUSIVAMENTE em JSON:
     [
-        {{"data": "DD/MM/AAAA", "descricao": "Nome", "tipo": "Receita" ou "Despesa", "valor": 123.45}}
+        {{"data": "DD/MM/AAAA", "descricao": "Nome da operação", "tipo": "Receita" ou "Despesa", "valor": 100.50}}
     ]
     EXTRATO:
-    {txt}
+    {conteudo}
     """
-    m = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config={"response_mime_type": "application/json"})
-    r = m.generate_content(prompt)
-    raw = r.text.strip()
-    if raw.startswith("```json"):
-        raw = raw[7:]
-    if raw.startswith("```"):
-        raw = raw[3:]
-    if raw.endswith("```"):
-        raw = raw[:-3]
-    return json.loads(raw.strip())
+    modelo = genai.GenerativeModel("gemini-2.5-flash", generation_config={"response_mime_type": "application/json"})
+    resposta = modelo.generate_content(prompt)
+    texto = resposta.text.strip()
+    if texto.startswith("```json"):
+        texto = texto[7:]
+    if texto.startswith("```"):
+        texto = texto[3:]
+    if texto.endswith("```"):
+        texto = texto[:-3]
+    return json.loads(texto.strip())
 
 # ==========================================
 # 📥 ABA 1: UPLOAD DE EXTRATOS
 # ==========================================
-if menu_sel == "📥 Upload de Extratos":
+if menu_cod == "Upload":
     st.markdown("""
         <div class="glass-card">
             <h2 style="margin:0; color:#d4af37;">📥 Importação de Extratos Bancários</h2>
-            <p style="color:#aaa; font-size:0.95rem; margin-top:6px;">Carregue extratos em PDF para conciliação automática.</p>
+            <p style="color:#aaa; font-size:0.95rem; margin-top:6px;">Carregue seus PDFs para conciliação automática.</p>
         </div>
     """, unsafe_allow_html=True)
     
     if eh_pro:
         st.markdown("##### 🌟 Multi-Arquivos (PRO)")
-        arqs = st.file_uploader("Selecione os PDFs", type=["pdf"], accept_multiple_files=True)
+        arquivos = st.file_uploader("Selecione os PDFs", type=["pdf"], accept_multiple_files=True)
     else:
-        st.markdown("##### 📄 Arquivo Individual (Básico)")
+        st.markdown("##### 📄 Upload Individual (Básico)")
         ar_un = st.file_uploader("Selecione o PDF", type=["pdf"], accept_multiple_files=False)
-        arqs = [ar_un] if ar_un else []
+        arquivos = [ar_un] if ar_un else []
         
     st.write("")
-    if arqs and st.button("🚀 Processar Extratos", use_container_width=True):
+    if arquivos and st.button("🚀 Processar Extratos", use_container_width=True):
         if not api_key:
-            st.error("Chave de API não configurada.")
+            st.error("Chave de integração não configurada.")
         else:
-            lista = []
-            with st.spinner("Processando..."):
-                for a in arqs:
+            acumulado = []
+            with st.spinner("Processando arquivos..."):
+                for doc in arquivos:
                     try:
-                        res = processar_pdf(a, api_key)
-                        lista.extend(res)
-                    except Exception as err:
-                        st.error(f"Erro em {a.name}: {err}")
-                if lista:
-                    st.session_state["transacoes"].extend(lista)
-                    st.success("✨ Processamento concluído com sucesso!")
-
-# ==========================================
-# 📊 ABA 2: DASHBOARD & MÉTRICAS
-# ==========================================
-elif menu_sel == "📊 Dashboard & Mét
+                        res = extrair_movimentacoes(doc, api_key)
+                        acumulado.extend(res)
