@@ -10,18 +10,25 @@ st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵",
 # --- PALETA DE CORES DARK & GOLD (PLANILHA) ---
 st.markdown("""
 <style>
+    /* Fundo geral e fontes */
     .stApp {
         background-color: #121212;
         color: #F3E5AB;
     }
+    
+    /* Barra Lateral */
     section[data-testid="stSidebar"] {
         background-color: #1A1A1A;
         border-right: 1px solid #2A2415;
     }
+    
+    /* Títulos e Cabeçalhos */
     h1, h2, h3, h4, h5, h6 {
         color: #D4AF37 !important;
         font-family: 'Segoe UI', sans-serif;
     }
+    
+    /* Abas / Tabs */
     button[data-baseweb="tab"] {
         color: #CCCCCC !important;
         background-color: transparent !important;
@@ -31,6 +38,8 @@ st.markdown("""
         border-bottom-color: #D4AF37 !important;
         font-weight: bold;
     }
+    
+    /* Cards de Métricas */
     div[data-testid="stMetric"] {
         background-color: #1E1E1E;
         border: 1px solid #2A2415;
@@ -38,6 +47,8 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
     }
+    
+    /* Botões */
     div.stButton > button {
         background-color: #2A2415;
         color: #D4AF37;
@@ -51,6 +62,8 @@ st.markdown("""
         color: #121212;
         border-color: #D4AF37;
     }
+    
+    /* Inputs */
     input, textarea, select {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
@@ -60,8 +73,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 1. GERENCIAMENTO DE USUÁRIOS, PLANOS E SESSÃO ---
-if "usuarios" not in st.session_state:
-    st.session_state["usuarios"] = {
+if "usuarios_db" not in st.session_state:
+    st.session_state["usuarios_db"] = {
         "admin": {"senha": "admin123", "plano": "Pro"},
         "Marcos": {"senha": "1234", "plano": "Pro"}
     }
@@ -88,7 +101,7 @@ def tela_autenticacao():
             senha = st.text_input("Senha", type="password", key="login_pass")
             
             if st.button("Entrar", use_container_width=True):
-                if usuario in st.session_state["usuarios"] and st.session_state["usuarios"][usuario]["senha"] == senha:
+                if usuario in st.session_state["usuarios_db"] and st.session_state["usuarios_db"][usuario]["senha"] == senha:
                     st.session_state["autenticado"] = True
                     st.session_state["usuario_logado"] = usuario
                     st.success("Login realizado com sucesso!")
@@ -105,22 +118,23 @@ def tela_autenticacao():
             if st.button("Cadastrar", use_container_width=True):
                 if not novo_usuario or not nova_senha:
                     st.warning("Preencha todos os campos.")
-                elif novo_usuario in st.session_state["usuarios"]:
+                elif novo_usuario in st.session_state["usuarios_db"]:
                     st.error("Este nome de usuário já existe.")
                 elif nova_senha != confirma_senha:
                     st.error("As senhas não coincidem.")
                 else:
-                    st.session_state["usuarios"][novo_usuario] = {"senha": nova_senha, "plano": "Gratuito"}
+                    st.session_state["usuarios_db"][novo_usuario] = {"senha": nova_senha, "plano": "Gratuito"}
                     st.success("Conta criada com sucesso! Acesse na aba 'Entrar'.")
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
 
-# Recupera o plano do usuário atual
-user_info = st.session_state["usuarios"].get(st.session_state["usuario_logado"], {"plano": "Gratuito"})
-plano_atual = user_info.get("plano", "Gratuito")
-eh_pro = plano_atual == "Pro"
+# Recupera o plano do usuário logado
+usuario_atual = st.session_state.get("usuario_logado", "")
+dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gratuito"})
+plano_atual = dados_usuario.get("plano", "Gratuito")
+eh_pro = (plano_atual == "Pro")
 
 # --- GESTÃO DA CHAVE DE API ---
 api_key = ""
@@ -132,26 +146,26 @@ except Exception:
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown(f"### 👤 {st.session_state['usuario_logado']}")
+    st.markdown(f"### 👤 {usuario_atual}")
     if eh_pro:
         st.markdown("<span style='background-color:#2A2415; color:#D4AF37; padding:4px 8px; border-radius:6px; border:1px solid #D4AF37; font-weight:bold;'>⭐ Plano PRO</span>", unsafe_allow_html=True)
     else:
         st.markdown("<span style='background-color:#222222; color:#AAAAAA; padding:4px 8px; border-radius:6px; border:1px solid #444444;'>Plano Básico (Gratuito)</span>", unsafe_allow_html=True)
     
-    if st.session_state["usuario_logado"] == "admin":
+    if usuario_atual == "admin":
         st.markdown("---")
         st.caption("🛡️ Painel do Administrador")
         with st.expander("👥 Gerenciar Usuários & Planos"):
-            for u, dados in st.session_state["usuarios"].items():
+            for u, dados in list(st.session_state["usuarios_db"].items()):
                 col_u1, col_u2 = st.columns([2, 1])
                 col_u1.write(f"**{u}** ({dados['plano']})")
                 if dados["plano"] == "Gratuito":
                     if col_u2.button("Virar Pro", key=f"btn_pro_{u}"):
-                        st.session_state["usuarios"][u]["plano"] = "Pro"
+                        st.session_state["usuarios_db"][u]["plano"] = "Pro"
                         st.rerun()
                 else:
                     if u != "admin" and col_u2.button("Downgrade", key=f"btn_down_{u}"):
-                        st.session_state["usuarios"][u]["plano"] = "Gratuito"
+                        st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
                         st.rerun()
 
     st.markdown("---")
@@ -499,7 +513,7 @@ with tab_assinatura:
             st.markdown("#### ⚡ Pix Instantâneo")
             st.info("Chave Pix de Pagamento: `financeiro@seusite.com` (Valor: R$ 19,90)")
             if st.button("✅ Confirmar Pagamento Pix e Ativar PRO", use_container_width=True):
-                st.session_state["usuarios"][st.session_state["usuario_logado"]]["plano"] = "Pro"
+                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
                 st.success("🎉 Parabéns! Sua assinatura PRO foi ativada com sucesso.")
                 st.rerun()
                 
@@ -510,7 +524,7 @@ with tab_assinatura:
             col_v1.text_input("Validade", placeholder="MM/AA")
             col_v2.text_input("CVV", type="password", placeholder="123")
             if st.button("Pagar R$ 19,90 e Assinar", use_container_width=True):
-                st.session_state["usuarios"][st.session_state["usuario_logado"]]["plano"] = "Pro"
+                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
                 st.success("🎉 Pagamento aprovado! Sua conta agora é PRO.")
                 st.rerun()
     else:
