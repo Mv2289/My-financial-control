@@ -7,36 +7,83 @@ from pypdf import PdfReader
 
 st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵", layout="wide")
 
-# --- 1. CONFIGURAÇÃO DE USUÁRIO / AUTENTICAÇÃO SIMPLES ---
+# --- 1. GERENCIAMENTO DE USUÁRIOS E SESSÃO ---
+if "usuarios" not in st.session_state:
+    # Usuários iniciais (Admin padrão e o seu usuário)
+    st.session_state["usuarios"] = {
+        "admin": "admin123",
+        "Marcos": "1234"
+    }
+
 if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
+if "usuario_logado" not in st.session_state:
+    st.session_state["usuario_logado"] = ""
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
 
-def login():
-    st.markdown("### 🔐 Acesso ao Gestor Financeiro")
+# --- TELA DE ACESSO COM ABAS: ENTRAR / CADASTRAR ---
+def tela_autenticacao():
+    st.markdown("<h2 style='text-align: center;'>🔐 Gestor Financeiro Inteligente</h2>", unsafe_allow_html=True)
+    st.write("")
+    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        usuario = st.text_input("Usuario")
-        senha = st.text_input("Senha", type="password")
-        if st.button("Entrar", use_container_width=True):
-            # Usuário e senha padrão configuráveis
-            if usuario == "Marcos" and senha == "1234":
-                st.session_state["autenticado"] = True
-                st.rerun()
-            else:
-                st.error("Usuário ou senha incorretos.")
+        aba_login, aba_cadastro = st.tabs(["🔑 Entrar", "📝 Criar Conta"])
+        
+        # ABA DE LOGIN
+        with aba_login:
+            st.subheader("Acesse sua conta")
+            usuario = st.text_input("Usuário", key="login_user")
+            senha = st.text_input("Senha", type="password", key="login_pass")
+            
+            if st.button("Entrar", use_container_width=True, type="primary"):
+                if usuario in st.session_state["usuarios"] and st.session_state["usuarios"][usuario] == senha:
+                    st.session_state["autenticado"] = True
+                    st.session_state["usuario_logado"] = usuario
+                    st.success("Login realizado com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+                    
+        # ABA DE CADASTRO
+        with aba_cadastro:
+            st.subheader("Novo Cadastro")
+            novo_usuario = st.text_input("Escolha um Nome de Usuário", key="cad_user")
+            nova_senha = st.text_input("Crie uma Senha", type="password", key="cad_pass")
+            confirma_senha = st.text_input("Confirme sua Senha", type="password", key="cad_pass_conf")
+            
+            if st.button("Cadastrar", use_container_width=True):
+                if not novo_usuario or not nova_senha:
+                    st.warning("Preencha todos os campos.")
+                elif novo_usuario in st.session_state["usuarios"]:
+                    st.error("Este nome de usuário já está cadastrado. Escolha outro.")
+                elif nova_senha != confirma_senha:
+                    st.error("As senhas não coincidem.")
+                else:
+                    st.session_state["usuarios"][novo_usuario] = nova_senha
+                    st.success("Conta criada com sucesso! Agora você já pode entrar na aba 'Entrar'.")
 
 if not st.session_state["autenticado"]:
-    login()
+    tela_autenticacao()
     st.stop()
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.title("⚙️ Configurações")
-    api_key = st.text_input("Gemini API Key (Google AI Studio)", type="password", help="Pegue gratuitamente em aistudio.google.com")
-    if st.button("Sair da Conta"):
+    st.title(f"👤 {st.session_state['usuario_logado']}")
+    if st.session_state["usuario_logado"] == "admin":
+        st.caption("🛡️ Perfil: Administrador")
+        with st.expander("👥 Usuários Cadastrados"):
+            st.write(list(st.session_state["usuarios"].keys()))
+            
+    st.markdown("---")
+    st.subheader("⚙️ Configurações de IA")
+    api_key = st.text_input("Gemini API Key", type="password", help="Pegue gratuitamente em aistudio.google.com")
+    
+    st.markdown("---")
+    if st.button("Sair da Conta", use_container_width=True):
         st.session_state["autenticado"] = False
+        st.session_state["usuario_logado"] = ""
         st.rerun()
 
 # --- 2. FUNÇÃO PARA LER EXTRATO COM GEMINI ---
@@ -85,7 +132,7 @@ with tab_upload:
     
     uploaded_file = st.file_uploader("Selecione o arquivo PDF do extrato", type=["pdf"])
     
-    if uploaded_file and st.button("Processar Extrato com IA", use_container_width=True):
+    if uploaded_file and st.button("Processar Extrato com IA", use_container_width=True, type="primary"):
         if not api_key:
             st.error("Por favor, insira sua chave da Gemini API na barra lateral.")
         else:
@@ -105,7 +152,6 @@ with tab_dashboard:
     if df.empty:
         st.warning("Nenhuma movimentação cadastrada. Suba um extrato na aba 'Upload de Extratos'.")
     else:
-        # Formatação
         df["valor"] = pd.to_numeric(df["valor"])
         df["data"] = pd.to_datetime(df["data"], format="%d/%m/%Y", errors="coerce")
         df = df.sort_values(by="data", ascending=False)
@@ -115,7 +161,6 @@ with tab_dashboard:
         saldo_liquido = total_entradas - total_saidas
         taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0
         
-        # Cards de KPI
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Total de Entradas", f"R$ {total_entradas:,.2f}")
         c2.metric("Total de Saídas", f"R$ {total_saidas:,.2f}")
@@ -124,7 +169,6 @@ with tab_dashboard:
         
         st.markdown("---")
         
-        # Gráficos
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             df_despesas = df[df["tipo"] == "Despesa"]
