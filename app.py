@@ -17,8 +17,8 @@ def login():
     st.markdown("### 🔐 Acesso ao Gestor Financeiro")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        usuario = st.text_input("Usuário")
-        senha = st.text_input("Senha", type="password")
+        usuario = st.text_input("admin")
+        senha = st.text_input("marcostoniolo", type="password")
         if st.button("Entrar", use_container_width=True):
             # Usuário e senha padrão configuráveis
             if usuario == "Marcos" and senha == "1234":
