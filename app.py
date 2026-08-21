@@ -148,7 +148,7 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = "MFC | Acesso Liberado"
-            msg["From"] = f"MFC Intelligence <{remetente}>"
+            msg["From"] = f"MFC Gestão Financeira <{remetente}>"
             msg["To"] = destinatario_email
             
             html = f"""
@@ -158,7 +158,7 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
                 <p style="font-size:15px; line-height:1.6; color:#ccc;">Olá <b>{nome_usuario}</b>, sua conta foi ativada com sucesso.</p>
                 <p style="font-size:14px; color:#999;">Agora você pode automatizar a conciliação dos seus extratos bancários com precisão institucional.</p>
                 <br>
-                <small style="color:#555;">MFC Intelligence • Plataforma de Gestão Financeira</small>
+                <small style="color:#555;">MFC • Plataforma de Gestão Financeira</small>
             </div>
             """
             msg.attach(MIMEText(html, "html"))
@@ -184,7 +184,7 @@ if "usuario_logado" not in st.session_state:
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
 
-# --- TELA DE LOGIN INSTITUCIONAL (LIMPA E DIRETA) ---
+# --- TELA DE LOGIN INSTITUCIONAL ---
 def tela_autenticacao():
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -204,7 +204,6 @@ def tela_autenticacao():
             st.write("")
             if st.button("Entrar no Painel", use_container_width=True):
                 user_clean = usuario.strip()
-                # Verifica usuário e senha (compatível com '1234' e '123' para Marcos)
                 if user_clean in st.session_state["usuarios_db"]:
                     senha_cadastrada = st.session_state["usuarios_db"][user_clean]["senha"]
                     if senha == senha_cadastrada or (user_clean == "Marcos" and senha in ["1234", "123"]):
@@ -298,8 +297,8 @@ with st.sidebar:
         st.markdown("---")
         
     if not api_key:
-        with st.expander("⚙️ Gemini API Key"):
-            api_key = st.text_input("Chave de API", type="password")
+        with st.expander("⚙️ Chave de Integração"):
+            api_key = st.text_input("Chave de Acesso", type="password")
 
     if st.session_state["transacoes"]:
         if st.button("🗑️ Limpar Dados Atuais", use_container_width=True):
@@ -311,7 +310,7 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# --- MOTOR DE LEITURA IA GEMINI ---
+# --- MOTOR DE CONCILIAÇÃO MFC ---
 def processar_extrato_pdf(file, chave_api):
     reader = PdfReader(file)
     texto_extrato = ""
@@ -384,7 +383,7 @@ if menu_selecionado == "📥 Upload de Extratos":
         <div class="glass-card">
             <h2 style="margin:0; color:#d4af37;">📥 Importação de Extratos Bancários</h2>
             <p style="color:#aaa; font-size:0.95rem; margin-top:6px;">
-                Carregue seus extratos em PDF (PicPay, Nubank, Itaú, Bradesco, etc.) para extração automática.
+                Carregue seus extratos em PDF (PicPay, Nubank, Itaú, Bradesco, etc.) para conciliação automática.
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -398,12 +397,12 @@ if menu_selecionado == "📥 Upload de Extratos":
         arquivos = [arquivo_unico] if arquivo_unico else []
         
     st.write("")
-    if arquivos and st.button("🚀 Processar Extratos com Inteligência Artificial", use_container_width=True):
+    if arquivos and st.button("🚀 Processar e Conciliar Extratos", use_container_width=True):
         if not api_key:
-            st.error("Chave de API não configurada. Adicione aos Secrets do Streamlit ou na barra lateral.")
+            st.error("Chave de acesso não configurada. Salve nos Secrets do Streamlit ou na barra lateral.")
         else:
             todas_transacoes = []
-            with st.spinner(f"Processando {len(arquivos)} documento(s)..."):
+            with st.spinner(f"Processando e conciliando {len(arquivos)} documento(s)..."):
                 for arq in arquivos:
                     try:
                         res = processar_extrato_pdf(arq, api_key)
@@ -555,7 +554,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 <div class="pro-tag">Recurso Exclusivo PRO</div>
                 <h2 style="color: #d4af37; margin: 15px 0 10px 0;">🔮 Planejamento Orçamentário</h2>
                 <p style="color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;">
-                    Projete metas para os próximos meses, gerencie despesas fixas e acompanhe sua capacidade de poupança com relatórios inteligentes.
+                    Projete metas para os próximos meses, gerencie despesas fixas e acompanhe sua capacidade de poupança com relatórios automatizados.
                 </p>
                 <div style="font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 15px;">R$ 19,90 / mês</div>
             </div>
@@ -635,7 +634,7 @@ elif menu_selecionado == "⭐ Assinatura PRO":
                     <li>✔ <b>Upload de múltiplos PDFs de uma só vez</b></li>
                     <li>✔ <b>Módulo completo de Planejamento Futuro</b></li>
                     <li>✔ Consolidação multi-bancos sem limites</li>
-                    <li>✔ Processamento de alta velocidade</li>
+                    <li>✔ Processamento prioritário de alta velocidade</li>
                 </ul>
             </div>
         """, unsafe_allow_html=True)
