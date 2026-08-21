@@ -180,8 +180,21 @@ def processar_extrato_pdf(file, chave_api):
     {texto_extrato}
     """
     
-    # Tenta com o modelo mais recente sugerido pelo endpoint
-    modelos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    # Modelos prioritários aceitos pelo Google AI Studio
+    modelos = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-2.5-pro"
+    ]
+    
+    # Tenta descobrir os modelos disponíveis na conta dinamicamente
+    try:
+        modelos_disponiveis = [m.name.replace("models/", "") for m in client.models.list()]
+        modelos = [m for m in modelos if m in modelos_disponiveis] + modelos_disponiveis
+    except Exception:
+        pass
+
     response = None
     ultimo_erro = None
     
@@ -202,7 +215,6 @@ def processar_extrato_pdf(file, chave_api):
         raise ultimo_erro
         
     return json.loads(response.text)
-
 # --- 3. INTERFACE PRINCIPAL ---
 st.markdown("<h2 style='color: #D4AF37;'>💵 PAINEL DE CONTROLE FINANCEIRO</h2>", unsafe_allow_html=True)
 
