@@ -180,12 +180,27 @@ def processar_extrato_pdf(file, chave_api):
     {texto_extrato}
     """
     
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config={"response_mime_type": "application/json"}
-    )
+    # Tenta com o modelo mais recente sugerido pelo endpoint
+    modelos = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    response = None
+    ultimo_erro = None
     
+    for modelo in modelos:
+        try:
+            response = client.models.generate_content(
+                model=modelo,
+                contents=prompt,
+                config={"response_mime_type": "application/json"}
+            )
+            if response and response.text:
+                break
+        except Exception as e:
+            ultimo_erro = e
+            continue
+            
+    if response is None:
+        raise ultimo_erro
+        
     return json.loads(response.text)
 
 # --- 3. INTERFACE PRINCIPAL ---
