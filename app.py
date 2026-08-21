@@ -10,25 +10,18 @@ st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵",
 # --- PALETA DE CORES DARK & GOLD (PLANILHA) ---
 st.markdown("""
 <style>
-    /* Fundo geral e fontes */
     .stApp {
         background-color: #121212;
         color: #F3E5AB;
     }
-    
-    /* Barra Lateral */
     section[data-testid="stSidebar"] {
         background-color: #1A1A1A;
         border-right: 1px solid #2A2415;
     }
-    
-    /* Títulos e Cabeçalhos */
     h1, h2, h3, h4, h5, h6 {
         color: #D4AF37 !important;
         font-family: 'Segoe UI', sans-serif;
     }
-    
-    /* Abas / Tabs */
     button[data-baseweb="tab"] {
         color: #CCCCCC !important;
         background-color: transparent !important;
@@ -38,8 +31,6 @@ st.markdown("""
         border-bottom-color: #D4AF37 !important;
         font-weight: bold;
     }
-    
-    /* Cards de Métricas */
     div[data-testid="stMetric"] {
         background-color: #1E1E1E;
         border: 1px solid #2A2415;
@@ -47,8 +38,6 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.4);
     }
-    
-    /* Botões */
     div.stButton > button {
         background-color: #2A2415;
         color: #D4AF37;
@@ -62,8 +51,6 @@ st.markdown("""
         color: #121212;
         border-color: #D4AF37;
     }
-    
-    /* Inputs */
     input, textarea, select {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
@@ -72,11 +59,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 1. GERENCIAMENTO DE USUÁRIOS E SESSÃO ---
+# --- 1. GERENCIAMENTO DE USUÁRIOS, PLANOS E SESSÃO ---
 if "usuarios" not in st.session_state:
     st.session_state["usuarios"] = {
-        "admin": "admin123",
-        "Marcos": "1234"
+        "admin": {"senha": "admin123", "plano": "Pro"},
+        "Marcos": {"senha": "1234", "plano": "Pro"}
     }
 
 if "autenticado" not in st.session_state:
@@ -88,7 +75,7 @@ if "transacoes" not in st.session_state:
 
 def tela_autenticacao():
     st.markdown("<h2 style='text-align: center; color: #D4AF37;'>💵 PAINEL DE CONTROLE FINANCEIRO</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #F3E5AB;'>Gerenciamento e análise de gastos</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #F3E5AB;'>Gerenciamento e análise inteligente de extratos</p>", unsafe_allow_html=True)
     st.write("")
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -101,7 +88,7 @@ def tela_autenticacao():
             senha = st.text_input("Senha", type="password", key="login_pass")
             
             if st.button("Entrar", use_container_width=True):
-                if usuario in st.session_state["usuarios"] and st.session_state["usuarios"][usuario] == senha:
+                if usuario in st.session_state["usuarios"] and st.session_state["usuarios"][usuario]["senha"] == senha:
                     st.session_state["autenticado"] = True
                     st.session_state["usuario_logado"] = usuario
                     st.success("Login realizado com sucesso!")
@@ -123,12 +110,17 @@ def tela_autenticacao():
                 elif nova_senha != confirma_senha:
                     st.error("As senhas não coincidem.")
                 else:
-                    st.session_state["usuarios"][novo_usuario] = nova_senha
+                    st.session_state["usuarios"][novo_usuario] = {"senha": nova_senha, "plano": "Gratuito"}
                     st.success("Conta criada com sucesso! Acesse na aba 'Entrar'.")
 
 if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
+
+# Recupera o plano do usuário atual
+user_info = st.session_state["usuarios"].get(st.session_state["usuario_logado"], {"plano": "Gratuito"})
+plano_atual = user_info.get("plano", "Gratuito")
+eh_pro = plano_atual == "Pro"
 
 # --- GESTÃO DA CHAVE DE API ---
 api_key = ""
@@ -141,11 +133,27 @@ except Exception:
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['usuario_logado']}")
+    if eh_pro:
+        st.markdown("<span style='background-color:#2A2415; color:#D4AF37; padding:4px 8px; border-radius:6px; border:1px solid #D4AF37; font-weight:bold;'>⭐ Plano PRO</span>", unsafe_allow_html=True)
+    else:
+        st.markdown("<span style='background-color:#222222; color:#AAAAAA; padding:4px 8px; border-radius:6px; border:1px solid #444444;'>Plano Básico (Gratuito)</span>", unsafe_allow_html=True)
+    
     if st.session_state["usuario_logado"] == "admin":
-        st.caption("🛡️ Perfil: Administrador")
-        with st.expander("👥 Usuários Cadastrados"):
-            st.write(list(st.session_state["usuarios"].keys()))
-            
+        st.markdown("---")
+        st.caption("🛡️ Painel do Administrador")
+        with st.expander("👥 Gerenciar Usuários & Planos"):
+            for u, dados in st.session_state["usuarios"].items():
+                col_u1, col_u2 = st.columns([2, 1])
+                col_u1.write(f"**{u}** ({dados['plano']})")
+                if dados["plano"] == "Gratuito":
+                    if col_u2.button("Virar Pro", key=f"btn_pro_{u}"):
+                        st.session_state["usuarios"][u]["plano"] = "Pro"
+                        st.rerun()
+                else:
+                    if u != "admin" and col_u2.button("Downgrade", key=f"btn_down_{u}"):
+                        st.session_state["usuarios"][u]["plano"] = "Gratuito"
+                        st.rerun()
+
     st.markdown("---")
     
     if not api_key:
@@ -240,32 +248,41 @@ def processar_extrato_pdf(file, chave_api):
 # --- 3. INTERFACE PRINCIPAL ---
 st.markdown("<h2 style='color: #D4AF37;'>💵 PAINEL DE CONTROLE FINANCEIRO</h2>", unsafe_allow_html=True)
 
-tab_upload, tab_dashboard, tab_planejamento = st.tabs([
+tab_upload, tab_dashboard, tab_planejamento, tab_assinatura = st.tabs([
     "📥 Upload de Extratos", 
     "📊 Resumo e Gráficos", 
-    "🔮 Planejamento Futuro"
+    "🔮 Planejamento Futuro",
+    "⭐ Assinatura PRO"
 ])
 
-# --- ABA 1: UPLOAD DE EXTRATO ---
+# --- ABA 1: UPLOAD DE EXTRATOS ---
 with tab_upload:
-    st.subheader("Suba o extrato bancário em PDF")
-    st.info("Envie o PDF do seu banco (PicPay, Nubank, Itaú, etc.). A IA extrai as datas, valores e descrições na hora.")
+    st.subheader("Suba seus extratos bancários em PDF")
     
-    uploaded_file = st.file_uploader("Selecione o arquivo PDF do extrato", type=["pdf"])
-    
-    col_btn1, col_btn2 = st.columns([2, 1])
-    with col_btn1:
-        if uploaded_file and st.button("Processar Extrato com IA", use_container_width=True):
-            if not api_key:
-                st.error("Chave de API não configurada. Salve nos Secrets do Streamlit ou informe na barra lateral.")
-            else:
-                with st.spinner("Lendo e processando extrato..."):
+    if eh_pro:
+        st.info("⭐ **Modo PRO Ativo:** Você pode selecionar e enviar múltiplos arquivos PDF simultaneamente.")
+        uploaded_files = st.file_uploader("Selecione um ou mais arquivos PDF", type=["pdf"], accept_multiple_files=True)
+    else:
+        st.info("ℹ️ **Plano Básico:** Upload limitado a 1 extrato por vez. Para enviar múltiplos extratos juntos, assine o plano PRO.")
+        uploaded_single = st.file_uploader("Selecione o arquivo PDF do extrato", type=["pdf"], accept_multiple_files=False)
+        uploaded_files = [uploaded_single] if uploaded_single else []
+
+    if uploaded_files and st.button("Processar Extrato(s) com IA", use_container_width=True):
+        if not api_key:
+            st.error("Chave de API não configurada. Salve nos Secrets do Streamlit ou informe na barra lateral.")
+        else:
+            novas_transacoes = []
+            with st.spinner(f"Processando {len(uploaded_files)} arquivo(s)..."):
+                for file in uploaded_files:
                     try:
-                        novos_dados = processar_extrato_pdf(uploaded_file, api_key)
-                        st.session_state["transacoes"].extend(novos_dados)
-                        st.success(f"Sucesso! {len(novos_dados)} transações importadas. Veja os resultados na aba 'Resumo e Gráficos'.")
+                        dados = processar_extrato_pdf(file, api_key)
+                        novas_transacoes.extend(dados)
                     except Exception as e:
-                        st.error(f"Erro ao processar arquivo: {e}")
+                        st.error(f"Erro ao processar '{file.name}': {e}")
+                
+                if novas_transacoes:
+                    st.session_state["transacoes"].extend(novas_transacoes)
+                    st.success(f"Sucesso! {len(novas_transacoes)} transações importadas no total. Acesse a aba 'Resumo e Gráficos'.")
 
 # --- PROCESSAMENTO DOS DADOS ---
 df = pd.DataFrame(st.session_state["transacoes"])
@@ -284,7 +301,7 @@ with tab_dashboard:
         saldo_liquido = total_entradas - total_saidas
         taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0
         
-        # --- CARDS DE KPIS ---
+        # Cards de KPIs
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(f"""
             <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; text-align: center;">
@@ -316,9 +333,8 @@ with tab_dashboard:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- TABELA DE LANÇAMENTOS DO EXTRATO (APENAS DATA, DESCRIÇÃO E VALOR COM CORES) ---
+        # Tabela com Cores
         st.subheader("📋 Transações do Extrato")
-        
         df_exibicao = df.copy()
         df_exibicao["valor_numerico"] = df_exibicao.apply(
             lambda row: row["valor"] if row["tipo"] == "Receita" else -row["valor"], axis=1
@@ -349,13 +365,11 @@ with tab_dashboard:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- GRÁFICO ÚNICO: COMPARATIVO ENTRADAS VS SAÍDAS COM VISUALIZAÇÃO APRIMORADA ---
+        # Gráfico Comparativo
         st.subheader("📊 Análise Gráfica: Fluxo Financeiro")
-        
         col_graf_centro, col_graf_vazia = st.columns([2, 1])
         with col_graf_centro:
             total_movimentado = total_entradas + total_saidas
-            
             fig = go.Figure(data=[go.Pie(
                 labels=["Entradas (Receitas)", "Saídas (Despesas)"],
                 values=[total_entradas, total_saidas],
@@ -393,32 +407,111 @@ with tab_dashboard:
                 margin=dict(t=30, b=50, l=20, r=20),
                 height=450
             )
-            
             st.plotly_chart(fig, use_container_width=True)
 
-# --- ABA 3: PLANEJAMENTO FUTURO ---
+# --- ABA 3: PLANEJAMENTO FUTURO (EXCLUSIVO PRO) ---
 with tab_planejamento:
-    st.subheader("🎯 Metas e Projeção de Gastos")
-    
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        renda_prevista = st.number_input("Renda Prevista para o Próximo Mês (R$)", value=4000.0, step=100.0)
-        teto_gastos = st.number_input("Teto Máximo de Gastos Desejado (R$)", value=2500.0, step=100.0)
-        meta_poupanca = renda_prevista - teto_gastos
-        
+    if not eh_pro:
         st.markdown(f"""
-            <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; margin-top: 15px;">
-                <p style="color: #C5A059; margin: 0; font-weight: bold;">Margem / Economia Projetada</p>
-                <h3 style="color: #00B050 !important; margin: 5px 0 0 0;">R$ {meta_poupanca:,.2f}</h3>
+            <div style="background-color: #1E1E1E; border: 1px solid #D4AF37; padding: 30px; border-radius: 12px; text-align: center;">
+                <h3 style="color: #D4AF37 !important;">🔒 Recurso Exclusivo do Plano PRO</h3>
+                <p style="color: #F3E5AB; font-size: 1.05rem;">
+                    A ferramenta de <b>Planejamento e Margem Futura</b> é reservada para assinantes PRO.<br>
+                    Defina tetos de gastos, projete custos fixos e acompanhe sua meta de economia mensal.
+                </p>
+                <p style="color: #00B050; font-size: 1.2rem; font-weight: bold;">Apenas R$ 19,90 / mês</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.write("")
+        if st.button("👉 Quero Desbloquear o Plano PRO Agora", use_container_width=True):
+            st.info("Vá até a aba **'⭐ Assinatura PRO'** para ativar o seu acesso!")
+    else:
+        st.subheader("🎯 Metas e Projeção de Gastos (PRO)")
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            renda_prevista = st.number_input("Renda Prevista para o Próximo Mês (R$)", value=4000.0, step=100.0)
+            teto_gastos = st.number_input("Teto Máximo de Gastos Desejado (R$)", value=2500.0, step=100.0)
+            meta_poupanca = renda_prevista - teto_gastos
+            
+            st.markdown(f"""
+                <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; margin-top: 15px;">
+                    <p style="color: #C5A059; margin: 0; font-weight: bold;">Margem / Economia Projetada</p>
+                    <h3 style="color: #00B050 !important; margin: 5px 0 0 0;">R$ {meta_poupanca:,.2f}</h3>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        with col_p2:
+            st.markdown("#### 💡 Simulação de Gastos Fixos")
+            gastos_fixos = st.number_input("Contas Fixas (Aluguel, Luz, Internet, etc.)", value=1200.0, step=50.0)
+            limite_lazer = teto_gastos - gastos_fixos
+            
+            if limite_lazer > 0:
+                st.success(f"Você terá livre para gastos variáveis (Lazer/Alimentação): **R$ {limite_lazer:,.2f}**")
+            else:
+                st.error("Atenção: Suas contas fixas estão ultrapassando o teto desejado!")
+
+# --- ABA 4: ASSINATURA PRO ---
+with tab_assinatura:
+    st.subheader("⭐ Planos & Assinatura")
+    
+    col_card1, col_card2 = st.columns(2)
+    
+    with col_card1:
+        st.markdown("""
+            <div style="background-color: #1A1A1A; border: 1px solid #333333; padding: 20px; border-radius: 10px; height: 100%;">
+                <h3 style="color: #CCCCCC !important; margin-top:0;">Plano Básico</h3>
+                <h2 style="color: #FFFFFF !important;">Grátis</h2>
+                <ul style="color: #AAAAAA; line-height: 1.8;">
+                    <li>Upload de 1 extrato por vez</li>
+                    <li>Resumo de entradas e saídas</li>
+                    <li>Tabela com valores coloridos</li>
+                    <li>Gráfico de fluxo financeiro</li>
+                    <li><strike>Upload múltiplo de extratos</strike></li>
+                    <li><strike>Aba de Planejamento Futuro</strike></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col_card2:
+        st.markdown("""
+            <div style="background-color: #1E1E1E; border: 2px solid #D4AF37; padding: 20px; border-radius: 10px; height: 100%;">
+                <h3 style="color: #D4AF37 !important; margin-top:0;">Plano PRO ⭐</h3>
+                <h2 style="color: #00B050 !important;">R$ 19,90 <span style="font-size: 1rem; color: #F3E5AB;">/ mês</span></h2>
+                <ul style="color: #F3E5AB; line-height: 1.8;">
+                    <li><b>Upload ilimitado de múltiplos PDFs simultâneos</b></li>
+                    <li><b>Acesso completo à aba de Planejamento Futuro</b></li>
+                    <li>Consolidação de múltiplos bancos/cartões</li>
+                    <li>Metas de gastos e projeção de economia</li>
+                    <li>Suporte prioritário e novidades em primeira mão</li>
+                </ul>
             </div>
         """, unsafe_allow_html=True)
     
-    with col_p2:
-        st.markdown("#### 💡 Simulação de Gastos Fixos")
-        gastos_fixos = st.number_input("Contas Fixas (Aluguel, Luz, Internet, etc.)", value=1200.0, step=50.0)
-        limite_lazer = teto_gastos - gastos_fixos
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    if not eh_pro:
+        st.subheader("💳 Assinar o Plano PRO")
+        st.markdown("Escolha a forma de pagamento e ative o seu plano instantaneamente:")
         
-        if limite_lazer > 0:
-            st.success(f"Você terá livre para gastos variáveis (Lazer/Alimentação): **R$ {limite_lazer:,.2f}**")
-        else:
-            st.error("Atenção: Suas contas fixas estão ultrapassando o teto desejado!")
+        col_pag1, col_pag2 = st.columns(2)
+        with col_pag1:
+            st.markdown("#### ⚡ Pix Instantâneo")
+            st.info("Chave Pix de Pagamento: `financeiro@seusite.com` (Valor: R$ 19,90)")
+            if st.button("✅ Confirmar Pagamento Pix e Ativar PRO", use_container_width=True):
+                st.session_state["usuarios"][st.session_state["usuario_logado"]]["plano"] = "Pro"
+                st.success("🎉 Parabéns! Sua assinatura PRO foi ativada com sucesso.")
+                st.rerun()
+                
+        with col_pag2:
+            st.markdown("#### 💳 Cartão de Crédito")
+            st.text_input("Número do Cartão", placeholder="0000 0000 0000 0000")
+            col_v1, col_v2 = st.columns(2)
+            col_v1.text_input("Validade", placeholder="MM/AA")
+            col_v2.text_input("CVV", type="password", placeholder="123")
+            if st.button("Pagar R$ 19,90 e Assinar", use_container_width=True):
+                st.session_state["usuarios"][st.session_state["usuario_logado"]]["plano"] = "Pro"
+                st.success("🎉 Pagamento aprovado! Sua conta agora é PRO.")
+                st.rerun()
+    else:
+        st.success("✅ Você já é um assinante PRO ativo! Aproveite todos os recursos liberados.")
