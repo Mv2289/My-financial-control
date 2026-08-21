@@ -3,4 +3,4 @@ pandas
 plotly
 google-generativeai
 pypdf
-segno
+mercadopago
