@@ -424,7 +424,7 @@ if menu_selecionado == "📥 Upload de Extratos":
 # ==========================================
 # 📊 ABA 2: DASHBOARD & MÉTRICAS
 # ==========================================
-elif menu_selecionado == "📊 Dashboard & MétICAS":
+elif menu_selecionado == "📊 Dashboard & Métricas":
     df_raw = pd.DataFrame(st.session_state["transacoes"])
     
     if df_raw.empty:
@@ -435,14 +435,17 @@ elif menu_selecionado == "📊 Dashboard & MétICAS":
             </div>
         """, unsafe_allow_html=True)
     else:
-        df_raw["valor"] = pd.to_numeric(df_raw["valor"])
+        df_raw["valor"] = pd.to_numeric(df_raw["valor"], errors="coerce").fillna(0.0)
         df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
         df_raw = df_raw.sort_values(by="data_dt", ascending=False)
         
-        total_entradas = float(df_raw[df_raw["tipo"] == "Receita"]["valor"].sum())
-        total_saidas = float(df_raw[df_raw["tipo"] == "Despesa"]["valor"].sum())
+        df_rec = df_raw[df_raw["tipo"] == "Receita"]
+        df_des = df_raw[df_raw["tipo"] == "Despesa"]
+        
+        total_entradas = float(df_rec["valor"].sum())
+        total_saidas = float(df_des["valor"].sum())
         saldo_liquido = total_entradas - total_saidas
-        taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0.0
+        taxa_poupanca = ((saldo_liquido / total_entradas) * 100.0) if total_entradas > 0 else 0.0
         cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
 
         k1, k2, k3, k4 = st.columns(4)
@@ -481,19 +484,17 @@ elif menu_selecionado == "📊 Dashboard & MétICAS":
         
         with c_tab:
             st.markdown("### 📋 Lançamentos Conciliados")
-            df_table = df_raw.copy()
-            df_table["valor_num"] = df_table.apply(lambda r: r["valor"] if r["tipo"] == "Receita" else -r["valor"], axis=1)
-            
-            df_render = df_table[["data", "descricao", "tipo", "valor_num"]].rename(
-                columns={"data": "Data", "descricao": "Descrição", "tipo": "Tipo", "valor_num": "Valor"}
-            )
+            df_render = df_raw[["data", "descricao", "tipo", "valor"]].copy()
             
             st.dataframe(
                 df_render,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "Valor": st.column_config.NumberColumn(
+                    "data": "Data",
+                    "descricao": "Descrição",
+                    "tipo": "Tipo",
+                    "valor": st.column_config.NumberColumn(
                         "Valor (R$)",
                         format="R$ %.2f"
                     )
@@ -592,7 +593,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE VIA HTML DIRETO)
+# ⭐ ABA 4: ASSINATURA PRO (QR CODE EMBED SEGURO)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -606,137 +607,4 @@ elif menu_selecionado == "⭐ Assinatura PRO":
     
     with col_c1:
         st.markdown("""
-            <div class="glass-card" style="border-color: rgba(255,255,255,0.06);">
-                <h3 style="color:#888 !important; margin-top:0;">Básico</h3>
-                <h2 style="color:#fff !important; font-size:1.8rem;">Grátis</h2>
-                <hr style="border-color: rgba(255,255,255,0.06);">
-                <ul style="color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;">
-                    <li>✔ 1 Upload por vez</li>
-                    <li>✔ Resumo de entradas e saídas</li>
-                    <li>✔ Gráficos de proporção</li>
-                    <li>✖ <strike>Multi-upload simultâneo</strike></li>
-                    <li>✖ <strike>Aba de Planejamento Futuro</strike></li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    with col_c2:
-        st.markdown("""
-            <div class="glass-card" style="border: 2px solid #d4af37;">
-                <div class="pro-tag">Recomendado</div>
-                <h3 style="color:#d4af37 !important; margin: 10px 0 0 0;">Plano PRO</h3>
-                <h2 style="color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;">
-                    R$ 19,90 <span style="font-size:0.9rem; color:#aaa; font-weight:400;">/ mês</span>
-                </h2>
-                <hr style="border-color: rgba(212,175,55,0.2);">
-                <ul style="color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;">
-                    <li>✔ <b>Upload de múltiplos PDFs de uma só vez</b></li>
-                    <li>✔ <b>Módulo completo de Planejamento Futuro</b></li>
-                    <li>✔ Consolidação multi-bancos sem limites</li>
-                    <li>✔ Processamento de alta velocidade</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
-        
-    if not eh_pro:
-        st.write("")
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.subheader("💳 Ativação do Plano PRO")
-        st.write("Efetue o pagamento de **R$ 19,90/mês** via Pix, Cartão ou Débito:")
-        
-        url_pagamento = "[https://mpago.la/2WHmRXN](https://mpago.la/2WHmRXN)"
-        
-        if st.button("📱 Gerar QR Code para Assinar", use_container_width=True):
-            st.session_state["mostrar_qr_code"] = True
-            
-        if st.session_state["mostrar_qr_code"]:
-            url_encoded = urllib.parse.quote_plus(url_pagamento)
-            qr_api_url = f"[https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=](https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=){url_encoded}&bgcolor=ffffff&color=08090b&margin=10"
-            
-            c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
-            with c_qr2:
-                st.markdown(f"""
-                    <div style="background:#ffffff; padding:18px; border-radius:12px; text-align:center; margin:20px 0;">
-                        <img src="{qr_api_url}" width="230" style="display:block; margin:0 auto;" />
-                        <p style="color:#08090b; font-weight:700; margin:12px 0 0 0; font-size:0.9rem;">
-                            Aponte a câmera do celular para pagar
-                        </p>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            st.markdown(f"""
-                <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:10px; font-size:0.85rem; color:#aaa; text-align:center;">
-                    🔗 Ou acesse o link direto no computador: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
-                </div>
-            """, unsafe_allow_html=True)
-        
-        st.write("")
-        st.markdown("---")
-        
-        if plano_atual == "Pendente":
-            st.warning("⏳ Sua solicitação de assinatura está em análise pelo administrador.")
-        else:
-            st.write("**Já realizou o pagamento pelo QR Code ou Link acima?**")
-            if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
-                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
-                st.info("Solicitação enviada para verificação!")
-                st.rerun()
-            
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown("""
-            <div class="glass-card" style="border-color: #00e676; text-align: center; margin-top: 20px;">
-                <h3 style="color: #00e676 !important; margin: 0;">✔ Assinatura PRO Ativa</h3>
-                <p style="color: #aaa; margin: 5px 0 0 0;">Você possui acesso a todos os recursos ilimitados do MFC.</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-# ==========================================
-# 👥 ABA 5: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA MARCOS / ADMIN)
-# ==========================================
-elif menu_selecionado == "👥 Gestão de Usuários" and eh_master:
-    st.markdown("""
-        <div class="glass-card">
-            <h2 style="margin:0; color:#d4af37;">👥 Painel de Controle de Usuários</h2>
-            <p style="color:#aaa; font-size:0.95rem; margin-top:4px;">
-                Visão exclusiva do administrador para gerenciar contas cadastradas, credenciais e liberar acessos ao plano PRO.
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    lista_usuarios = []
-    for nome_u, info_u in st.session_state["usuarios_db"].items():
-        lista_usuarios.append({
-            "Nome de Usuário": nome_u,
-            "E-mail": info_u.get("email", "-"),
-            "Senha": info_u.get("senha", "-"),
-            "Plano Atual": info_u.get("plano", "Gratuito")
-        })
-        
-    df_users = pd.DataFrame(lista_usuarios)
-    st.dataframe(df_users, use_container_width=True, hide_index=True)
-    
-    st.write("")
-    st.markdown("### ⚡ Ações Rápidas de Planos")
-    
-    for u, dados in list(st.session_state["usuarios_db"].items()):
-        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
-        
-        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
-        
-        col_m1.markdown(f"**{u}** — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span>", unsafe_allow_html=True)
-        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
-        
-        if dados["plano"] != "Pro":
-            if col_m2.button("⭐ Ativar PRO", key=f"btn_pro_{u}"):
-                st.session_state["usuarios_db"][u]["plano"] = "Pro"
-                st.success(f"{u} agora é PRO!")
-                st.rerun()
-        else:
-            if u not in ["admin"]:
-                if col_m3.button("❌ Desativar", key=f"btn_down_{u}"):
-                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                    st.info(f"{u} voltou ao Básico.")
-                    st.rerun()
-                    
-        st.markdown("---")
+            <div class="glass-card" style="border-color: rgba(
