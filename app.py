@@ -151,6 +151,38 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- GERADOR OFICIAL DE PAYLOAD PIX (BR CODE BACEN) ---
+def gerar_payload_pix(chave_pix, nome_titular, cidade_titular, valor=19.90, txid="MFCPRO"):
+    def tlv(tag, valor_str):
+        return f"{tag}{len(valor_str):02d}{valor_str}"
+
+    merchant_account = tlv("00", "br.gov.bcb.pix") + tlv("01", chave_pix)
+    
+    payload = (
+        tlv("00", "01") +
+        tlv("26", merchant_account) +
+        tlv("52", "0000") +
+        tlv("53", "986") +
+        tlv("54", f"{valor:.2f}") +
+        tlv("58", "BR") +
+        tlv("59", nome_titular[:25].upper()) +
+        tlv("60", cidade_titular[:15].upper()) +
+        tlv("62", tlv("05", txid[:25])) +
+        "6304"
+    )
+
+    crc = 0xFFFF
+    for char in payload:
+        crc ^= ord(char) << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
+            else:
+                crc = (crc << 1) & 0xFFFF
+                
+    crc_hex = f"{crc:04X}"
+    return payload + crc_hex
+
 # --- FUNÇÃO DE E-MAIL ---
 def enviar_email_boas_vindas(destinatario_email, nome_usuario):
     remetente = st.secrets.get("EMAIL_REMETENTE", "")
@@ -592,7 +624,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (COM QR CODE LOCAL SVG)
+# ⭐ ABA 4: ASSINATURA PRO (PIX OFICIAL BACEN)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -641,34 +673,40 @@ elif menu_selecionado == "⭐ Assinatura PRO":
     if not eh_pro:
         st.write("")
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.subheader("💳 Ativação do Plano PRO")
-        st.write("Efetue o pagamento de **R$ 19,90/mês** via Pix, Cartão ou Débito:")
+        st.subheader("💳 Ativação Instantânea via Pix")
+        st.write("Valor da assinatura mensal: **R$ 19,90**")
         
-        url_pagamento = "[https://mpago.la/2WHmRXN](https://mpago.la/2WHmRXN)"
+        # Dados do Titular Pix
+        chave_pix = "cf58d39f-09f1-4134-9b18-7fc86045ce49"
+        nome_titular = "MARCOS VINICIUS"
+        cidade_titular = "CURITIBA"
         
-        if st.button("📱 Gerar QR Code para Assinar", use_container_width=True):
+        if st.button("📱 Gerar QR Code Pix (R$ 19,90)", use_container_width=True):
             st.session_state["mostrar_qr_code"] = True
             
         if st.session_state["mostrar_qr_code"]:
-            qr = segno.make(url_pagamento, error='m')
+            payload_pix = gerar_payload_pix(chave_pix, nome_titular, cidade_titular, valor=19.90)
+            
+            qr = segno.make(payload_pix, error='m')
             svg_uri = qr.svg_data_uri(scale=6, dark='#08090b', light='#ffffff')
             
             c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
             with c_qr2:
                 st.markdown(f"""
-                    <div style="background:#ffffff; padding:18px; border-radius:12px; text-align:center; margin:20px 0; max-width:270px; margin-left:auto; margin-right:auto;">
-                        <img src="{svg_uri}" width="230" style="display:block; margin:0 auto;" alt="QR Code" />
-                        <p style="color:#08090b; font-weight:700; margin:12px 0 0 0; font-size:0.9rem;">
-                            Aponte a câmera do celular para pagar
+                    <div style="background:#ffffff; padding:20px; border-radius:14px; text-align:center; margin:20px 0; max-width:280px; margin-left:auto; margin-right:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+                        <img src="{svg_uri}" width="220" style="display:block; margin:0 auto;" alt="QR Code Pix" />
+                        <p style="color:#08090b; font-weight:800; margin:12px 0 2px 0; font-size:1rem;">
+                            R$ 19,90
+                        </p>
+                        <p style="color:#555; margin:0; font-size:0.78rem;">
+                            Abra o app do seu banco ou a câmera do celular para pagar
                         </p>
                     </div>
                 """, unsafe_allow_html=True)
                 
-            st.markdown(f"""
-                <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:10px; font-size:0.85rem; color:#aaa; text-align:center;">
-                    🔗 Ou acesse o link direto no computador: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown("##### 📋 Pix Copia e Cola")
+            st.code(payload_pix, language="text")
+            st.caption("Copie o código acima e cole na opção 'Pix Copia e Cola' do seu banco.")
         
         st.write("")
         st.markdown("---")
@@ -676,7 +714,7 @@ elif menu_selecionado == "⭐ Assinatura PRO":
         if plano_atual == "Pendente":
             st.warning("⏳ Sua solicitação de assinatura está em análise pelo administrador.")
         else:
-            st.write("**Já realizou o pagamento pelo QR Code ou Link acima?**")
+            st.write("**Já realizou o pagamento pelo QR Code ou Pix Copia e Cola?**")
             if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
                 st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
                 st.info("Solicitação enviada para verificação!")
