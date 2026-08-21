@@ -8,28 +8,21 @@ from pypdf import PdfReader
 
 st.set_page_config(page_title="Gestor Financeiro Inteligente", page_icon="💵", layout="wide")
 
-# --- PALETA DE CORES DA SUA PLANILHA (CSS PERSONALIZADO) ---
+# --- PALETA DE CORES DARK & GOLD ---
 st.markdown("""
 <style>
-    /* Fundo geral e fontes */
     .stApp {
         background-color: #121212;
         color: #F3E5AB;
     }
-    
-    /* Barra Lateral */
     section[data-testid="stSidebar"] {
         background-color: #1A1A1A;
         border-right: 1px solid #2A2415;
     }
-    
-    /* Títulos e Cabeçalhos */
     h1, h2, h3, h4, h5, h6 {
         color: #D4AF37 !important;
         font-family: 'Segoe UI', sans-serif;
     }
-    
-    /* Abas / Tabs */
     button[data-baseweb="tab"] {
         color: #CCCCCC !important;
         background-color: transparent !important;
@@ -39,8 +32,6 @@ st.markdown("""
         border-bottom-color: #D4AF37 !important;
         font-weight: bold;
     }
-    
-    /* Cards de Métricas / KPIs */
     div[data-testid="stMetric"] {
         background-color: #1E1E1E;
         border: 1px solid #2A2415;
@@ -57,8 +48,6 @@ st.markdown("""
         color: #FFFFFF !important;
         font-weight: bold;
     }
-    
-    /* Botões */
     div.stButton > button {
         background-color: #2A2415;
         color: #D4AF37;
@@ -72,8 +61,6 @@ st.markdown("""
         color: #121212;
         border-color: #D4AF37;
     }
-    
-    /* Inputs */
     input, textarea, select {
         background-color: #1E1E1E !important;
         color: #FFFFFF !important;
@@ -140,6 +127,14 @@ if not st.session_state["autenticado"]:
     tela_autenticacao()
     st.stop()
 
+# --- GESTÃO DA CHAVE DE API (AUTOMÁTICA OU MANUAL) ---
+api_key = ""
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    pass
+
 # --- BARRA LATERAL ---
 with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['usuario_logado']}")
@@ -149,10 +144,13 @@ with st.sidebar:
             st.write(list(st.session_state["usuarios"].keys()))
             
     st.markdown("---")
-    st.subheader("⚙️ Configurações de IA")
-    api_key = st.text_input("Gemini API Key", type="password", help="Pegue gratuitamente em aistudio.google.com")
     
-    st.markdown("---")
+    # Se a chave NÃO estiver nos secrets do servidor, mostra o campo na lateral
+    if not api_key:
+        st.subheader("⚙️ Configurações de IA")
+        api_key = st.text_input("Gemini API Key", type="password", help="Pegue gratuitamente em aistudio.google.com")
+        st.markdown("---")
+        
     if st.button("Sair da Conta", use_container_width=True):
         st.session_state["autenticado"] = False
         st.session_state["usuario_logado"] = ""
@@ -180,7 +178,6 @@ def processar_extrato_pdf(file, chave_api):
     {texto_extrato}
     """
     
-    # Modelos prioritários aceitos pelo Google AI Studio
     modelos = [
         "gemini-2.5-flash",
         "gemini-2.0-flash",
@@ -188,7 +185,6 @@ def processar_extrato_pdf(file, chave_api):
         "gemini-2.5-pro"
     ]
     
-    # Tenta descobrir os modelos disponíveis na conta dinamicamente
     try:
         modelos_disponiveis = [m.name.replace("models/", "") for m in client.models.list()]
         modelos = [m for m in modelos if m in modelos_disponiveis] + modelos_disponiveis
@@ -215,6 +211,7 @@ def processar_extrato_pdf(file, chave_api):
         raise ultimo_erro
         
     return json.loads(response.text)
+
 # --- 3. INTERFACE PRINCIPAL ---
 st.markdown("<h2 style='color: #D4AF37;'>💵 PAINEL DE CONTROLE FINANCEIRO</h2>", unsafe_allow_html=True)
 
@@ -233,7 +230,7 @@ with tab_upload:
     
     if uploaded_file and st.button("Processar Extrato com IA", use_container_width=True):
         if not api_key:
-            st.error("Por favor, insira sua chave da Gemini API na barra lateral.")
+            st.error("Chave de API não configurada. Salve nos Secrets do Streamlit ou informe na barra lateral.")
         else:
             with st.spinner("Lendo e categorizando lançamentos..."):
                 try:
@@ -260,7 +257,6 @@ with tab_dashboard:
         saldo_liquido = total_entradas - total_saidas
         taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0
         
-        # Cards de KPI com cores personalizadas
         c1, c2, c3, c4 = st.columns(4)
         c1.markdown(f"""
             <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; text-align: center;">
@@ -292,7 +288,6 @@ with tab_dashboard:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # Gráficos na paleta Dark & Gold
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             df_despesas = df[df["tipo"] == "Despesa"]
