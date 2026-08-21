@@ -435,4 +435,308 @@ if menu_selecionado == "📥 Upload de Extratos":
                 if todas_transacoes:
                     st.session_state["transacoes"].extend(todas_transacoes)
                     st.success(f"✨ Sucesso! {len(todas_transacoes)} movimentações consolidadas.")
-                    st.info("👉 Acesse a aba 📊 Dashboard & Métricas para ver a análise
+                    st.info("👉 Acesse a aba 📊 Dashboard & Métricas para ver a análise.")
+
+# ==========================================
+# 📊 ABA 2: DASHBOARD & MÉTRICAS
+# ==========================================
+elif menu_selecionado == "📊 Dashboard & Métricas":
+    df_raw = pd.DataFrame(st.session_state["transacoes"])
+    
+    if df_raw.empty:
+        st.markdown("""
+            <div class="glass-card" style="text-align:center; padding: 40px;">
+                <h3 style="color:#888;">Nenhum Extrato Importado</h3>
+                <p style="color:#666;">Faça o upload do seu primeiro PDF bancário na aba 'Upload de Extratos'.</p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        df_raw["valor"] = pd.to_numeric(df_raw["valor"])
+        df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
+        df_raw = df_raw.sort_values(by="data_dt", ascending=False)
+        
+        total_entradas = float(df_raw[df_raw["tipo"] == "Receita"]["valor"].sum())
+        total_saidas = float(df_raw[df_raw["tipo"] == "Despesa"]["valor"].sum())
+        saldo_liquido = total_entradas - total_saidas
+        taxa_poupanca = ((saldo_liquido / total_entradas) * 100) if total_entradas > 0 else 0.0
+        cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown(f"""
+            <div class="kpi-box">
+                <div class="kpi-label">Receitas (Entradas)</div>
+                <div class="kpi-val" style="color: #00e676;">+ R$ {total_entradas:,.2f}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        k2.markdown(f"""
+            <div class="kpi-box">
+                <div class="kpi-label">Despesas (Saídas)</div>
+                <div class="kpi-val" style="color: #ff5252;">- R$ {total_saidas:,.2f}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        k3.markdown(f"""
+            <div class="kpi-box">
+                <div class="kpi-label">Saldo Líquido</div>
+                <div class="kpi-val" style="color: {cor_saldo};">R$ {saldo_liquido:,.2f}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        k4.markdown(f"""
+            <div class="kpi-box">
+                <div class="kpi-label">Taxa de Poupança</div>
+                <div class="kpi-val" style="color: #d4af37;">{taxa_poupanca:.1f}%</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("")
+        st.write("")
+        
+        c_tab, c_graf = st.columns([1.3, 1.1])
+        
+        with c_tab:
+            st.markdown("### 📋 Lançamentos Conciliados")
+            df_table = df_raw.copy()
+            df_table["valor_num"] = df_table.apply(lambda r: r["valor"] if r["tipo"] == "Receita" else -r["valor"], axis=1)
+            
+            df_render = df_table[["data", "descricao", "valor_num"]].rename(
+                columns={"data": "Data", "descricao": "Descrição", "valor_num": "Valor (R$)"}
+            )
+            
+            def cor_valor(val):
+                return 'color: #00e676; font-weight: 700;' if val > 0 else 'color: #ff5252; font-weight: 700;'
+
+            styler = df_render.style.format({
+                "Valor (R$)": lambda x: f"+ R$ {x:,.2f}" if x > 0 else f"- R$ {abs(x):,.2f}"
+            })
+            
+            try:
+                styler = styler.map(cor_valor, subset=["Valor (R$)"])
+            except AttributeError:
+                styler = styler.applymap(cor_valor, subset=["Valor (R$)"])
+
+            st.dataframe(
+                styler,
+                use_container_width=True,
+                hide_index=True,
+                height=450
+            )
+            
+        with c_graf:
+            st.markdown("### 🍩 Proporção de Fluxo")
+            total_vol = total_entradas + total_saidas
+            
+            fig = go.Figure(data=[go.Pie(
+                labels=["Entradas (Receitas)", "Saídas (Despesas)"],
+                values=[total_entradas, total_saidas],
+                hole=0.62,
+                marker=dict(
+                    colors=["#00e676", "#ff5252"],
+                    line=dict(color="#08090b", width=3)
+                ),
+                textinfo="percent",
+                textfont=dict(size=14, color="#ffffff", family="Inter"),
+                hovertemplate="<b>%{label}</b><br>Volume: R$ %{value:,.2f}<br>Proporção: %{percent}<extra></extra>"
+            )])
+            
+            fig.update_layout(
+                paper_bgcolor="#0f1117",
+                plot_bgcolor="#0f1117",
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.15,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(color="#e5e5e5", size=12)
+                ),
+                annotations=[
+                    dict(
+                        text=f"<span style='font-size:11px; color:#888;'>VOLUME TOTAL</span><br><b style='font-size:16px; color:#ffffff;'>R$ {total_vol:,.2f}</b>",
+                        x=0.5, y=0.5,
+                        font_size=14,
+                        showarrow=False
+                    )
+                ],
+                margin=dict(t=10, b=30, l=10, r=10),
+                height=450
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+# ==========================================
+# 🔮 ABA 3: PLANEJAMENTO FUTURO
+# ==========================================
+elif menu_selecionado == "🔮 Planejamento Futuro":
+    if not eh_pro:
+        st.markdown("""
+            <div class="glass-card" style="text-align: center; border: 1px solid #d4af37; padding: 40px 20px;">
+                <div class="pro-tag">Recurso Exclusivo PRO</div>
+                <h2 style="color: #d4af37; margin: 15px 0 10px 0;">🔮 Planejamento Orçamentário</h2>
+                <p style="color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;">
+                    Projete metas para os próximos meses, gerencie despesas fixas e acompanhe sua capacidade de poupança com relatórios automatizados.
+                </p>
+                <div style="font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 15px;">R$ 19,90 / mês</div>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div class="glass-card">
+                <h2 style="margin:0; color:#d4af37;">🔮 Planejamento Orçamentário Estratégico</h2>
+                <p style="color:#aaa; font-size:0.95rem; margin-top:4px;">Simulação preditiva de metas e capacidade de investimento.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("#### 🎯 Metas de Gastos")
+            renda_est = st.number_input("Renda Prevista (R$)", value=5000.0, step=200.0)
+            teto_gasto = st.number_input("Teto Máximo Desejado (R$)", value=3200.0, step=100.0)
+            meta_sobra = renda_est - teto_gasto
+            
+            st.markdown(f"""
+                <div class="kpi-box" style="margin-top: 15px; text-align: left; border-color: rgba(212,175,55,0.3);">
+                    <div class="kpi-label">Economia Projetada</div>
+                    <div class="kpi-val" style="color: #00e676;">R$ {meta_sobra:,.2f}</div>
+                    <small style="color: #666;">Capacidade de poupança mensal</small>
+                </div>
+            """, unsafe_allow_html=True)
+            
+        with col_p2:
+            st.markdown("#### 💡 Despesas Fixas")
+            fixos = st.number_input("Custos Recorrentes (Aluguel, Luz, etc.)", value=1800.0, step=100.0)
+            livre_lazer = teto_gasto - fixos
+            
+            if livre_lazer > 0:
+                st.success(f"Saldo Livre para Lazer & Variáveis: **R$ {livre_lazer:,.2f}**")
+            else:
+                st.error("Atenção: Os custos fixos estão superando o teto planejado.")
+
+# ==========================================
+# ⭐ ABA 4: ASSINATURA PRO (LINK ATUALIZADO)
+# ==========================================
+elif menu_selecionado == "⭐ Assinatura PRO":
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div class="brand-title" style="font-size: 2.2rem;">MFC PRO</div>
+            <p style="color: #888; font-size: 0.95rem; margin-top: 4px;">Eleve o seu controle patrimonial a outro nível</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col_c1, col_c2 = st.columns(2)
+    
+    with col_c1:
+        st.markdown("""
+            <div class="glass-card" style="border-color: rgba(255,255,255,0.06);">
+                <h3 style="color:#888 !important; margin-top:0;">Básico</h3>
+                <h2 style="color:#fff !important; font-size:1.8rem;">Grátis</h2>
+                <hr style="border-color: rgba(255,255,255,0.06);">
+                <ul style="color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;">
+                    <li>✔ 1 Upload por vez</li>
+                    <li>✔ Resumo de entradas e saídas</li>
+                    <li>✔ Gráficos de proporção</li>
+                    <li>✖ <strike>Multi-upload simultâneo</strike></li>
+                    <li>✖ <strike>Aba de Planejamento Futuro</strike></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    with col_c2:
+        st.markdown("""
+            <div class="glass-card" style="border: 2px solid #d4af37;">
+                <div class="pro-tag">Recomendado</div>
+                <h3 style="color:#d4af37 !important; margin: 10px 0 0 0;">Plano PRO</h3>
+                <h2 style="color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;">
+                    R$ 19,90 <span style="font-size:0.9rem; color:#aaa; font-weight:400;">/ mês</span>
+                </h2>
+                <hr style="border-color: rgba(212,175,55,0.2);">
+                <ul style="color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;">
+                    <li>✔ <b>Upload de múltiplos PDFs de uma só vez</b></li>
+                    <li>✔ <b>Módulo completo de Planejamento Futuro</b></li>
+                    <li>✔ Consolidação multi-bancos sem limites</li>
+                    <li>✔ Processamento de alta velocidade</li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+        
+    if not eh_pro:
+        st.write("")
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.subheader("💳 Ativação Segura do Plano")
+        st.write("Pague com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
+        
+        url_pagamento = "[https://mpago.la/2WHmRXN](https://mpago.la/2WHmRXN)"
+        
+        st.link_button(
+            "💳 Abrir Checkout Seguro (R$ 19,90/mês)",
+            url=url_pagamento,
+            use_container_width=True
+        )
+        
+        st.markdown(f"""
+            <div style="background:#12151c; border:1px solid #232733; padding:12px; border-radius:8px; margin-top:12px; font-size:0.85rem; color:#aaa;">
+                🔗 Link direto alternativo: <a href="{url_pagamento}" target="_blank" style="color:#d4af37; word-break:break-all;">{url_pagamento}</a>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
+        st.write("")
+        st.markdown("---")
+        
+        if plano_atual == "Pendente":
+            st.warning("⏳ Sua solicitação de assinatura está em análise pelo administrador. Seus recursos PRO serão desbloqueados após a confirmação.")
+        else:
+            st.write("**Já realizou o pagamento pelo link acima?**")
+            if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
+                st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
+                st.info("Solicitação enviada! O administrador verificará a confirmação do pagamento para liberar o acesso.")
+                st.rerun()
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.markdown("""
+            <div class="glass-card" style="border-color: #00e676; text-align: center; margin-top: 20px;">
+                <h3 style="color: #00e676 !important; margin: 0;">✔ Assinatura PRO Ativa</h3>
+                <p style="color: #aaa; margin: 5px 0 0 0;">Você possui acesso a todos os recursos ilimitados do MFC.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+# ==========================================
+# 👥 ABA 5: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA MARCOS / ADMIN)
+# ==========================================
+elif menu_selecionado == "👥 Gestão de Usuários" and eh_master:
+    st.markdown("""
+        <div class="glass-card">
+            <h2 style="margin:0; color:#d4af37;">👥 Painel de Controle de Usuários</h2>
+            <p style="color:#aaa; font-size:0.95rem; margin-top:4px;">
+                Visão exclusiva do administrador para gerenciar contas cadastradas, credenciais e liberar acessos ao plano PRO.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    lista_usuarios = []
+    for nome_u, info_u in st.session_state["usuarios_db"].items():
+        lista_usuarios.append({
+            "Nome de Usuário": nome_u,
+            "E-mail": info_u.get("email", "-"),
+            "Senha": info_u.get("senha", "-"),
+            "Plano Atual": info_u.get("plano", "Gratuito")
+        })
+        
+    df_users = pd.DataFrame(lista_usuarios)
+    st.dataframe(df_users, use_container_width=True, hide_index=True)
+    
+    st.write("")
+    st.markdown("### ⚡ Ações Rápidas de Planos")
+    
+    for u, dados in list(st.session_state["usuarios_db"].items()):
+        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
+        
+        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
+        
+        col_m1.markdown(f"**{u}** — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span>", unsafe_allow_html=True)
+        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
+        
+        if dados["plano"] != "Pro":
+            if col_m2.button("⭐ Ativar
