@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import google.generativeai as genai
 import json
@@ -203,7 +202,6 @@ def processar_extrato_pdf(file, chave_api):
     - "data": string (formato DD/MM/AAAA)
     - "descricao": string (nome da pessoa, loja ou serviço)
     - "tipo": string ("Receita" para entradas/rendimentos ou "Despesa" para pagamentos/débitos/saídas)
-    - "categoria": string (escolha entre: Alimentação, Transporte, Lazer / Outros, Cartão de credito, Salário, Investimento, Vendas, Conta Mensal)
     - "valor": float (valor numérico positivo com ponto, ex: 35.50)
 
     EXTRATO:
@@ -261,7 +259,7 @@ with tab_upload:
             if not api_key:
                 st.error("Chave de API não configurada. Salve nos Secrets do Streamlit ou informe na barra lateral.")
             else:
-                with st.spinner("Lendo e categorizando lançamentos..."):
+                with st.spinner("Lendo e processando extrato..."):
                     try:
                         novos_dados = processar_extrato_pdf(uploaded_file, api_key)
                         st.session_state["transacoes"].extend(novos_dados)
@@ -291,14 +289,14 @@ with tab_dashboard:
         c1.markdown(f"""
             <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; text-align: center;">
                 <p style="color: #C5A059; margin: 0; font-weight: bold; font-size: 0.9rem;">RECEITAS (ENTRADAS) 💰</p>
-                <h3 style="color: #00B050 !important; margin: 5px 0 0 0;">R$ {total_entradas:,.2f}</h3>
+                <h3 style="color: #00B050 !important; margin: 5px 0 0 0;">+ R$ {total_entradas:,.2f}</h3>
             </div>
         """, unsafe_allow_html=True)
         
         c2.markdown(f"""
             <div style="background-color: #1E1E1E; border: 1px solid #2A2415; padding: 15px; border-radius: 10px; text-align: center;">
                 <p style="color: #C5A059; margin: 0; font-weight: bold; font-size: 0.9rem;">DESPESAS (SAÍDAS) 💸</p>
-                <h3 style="color: #FF5252 !important; margin: 5px 0 0 0;">R$ {total_saidas:,.2f}</h3>
+                <h3 style="color: #FF5252 !important; margin: 5px 0 0 0;">- R$ {total_saidas:,.2f}</h3>
             </div>
         """, unsafe_allow_html=True)
         
@@ -318,74 +316,85 @@ with tab_dashboard:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- TABELA DE LANÇAMENTOS DO EXTRATO ---
-        st.subheader("📋 Transações Extraídas do Extrato")
+        # --- TABELA DE LANÇAMENTOS DO EXTRATO (APENAS DATA, DESCRIÇÃO E VALOR COM CORES) ---
+        st.subheader("📋 Transações do Extrato")
         
-        # Preparando tabela amigável
-        df_exibicao = df[["data", "descricao", "tipo", "categoria", "valor"]].copy()
-        df_exibicao.columns = ["Data da Transação", "Descrição", "Tipo", "Categoria", "Valor (R$)"]
-        df_exibicao["Valor (R$)"] = df_exibicao["Valor (R$)"].apply(lambda x: f"R$ {x:,.2f}")
+        df_exibicao = df.copy()
+        df_exibicao["valor_numerico"] = df_exibicao.apply(
+            lambda row: row["valor"] if row["tipo"] == "Receita" else -row["valor"], axis=1
+        )
         
-        st.dataframe(df_exibicao, use_container_width=True, hide_index=True)
+        df_tabela = df_exibicao[["data", "descricao", "valor_numerico"]].rename(
+            columns={
+                "data": "Data da Transação",
+                "descricao": "Descrição",
+                "valor_numerico": "Valor (R$)"
+            }
+        )
+        
+        def estilo_valor(val):
+            if val > 0:
+                return 'color: #00B050; font-weight: bold;'
+            elif val < 0:
+                return 'color: #FF5252; font-weight: bold;'
+            return 'color: #F3E5AB;'
+
+        st.dataframe(
+            df_tabela.style
+                .format({"Valor (R$)": lambda x: f"+ R$ {x:,.2f}" if x > 0 else f"- R$ {abs(x):,.2f}"})
+                .map(estilo_valor, subset=["Valor (R$)"]),
+            use_container_width=True,
+            hide_index=True
+        )
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- GRÁFICOS NO FINAL DA PÁGINA (IGUAL À PLANILHA) ---
-        st.subheader("📊 Análise Gráfica")
-        col_g1, col_g2 = st.columns(2)
+        # --- GRÁFICO ÚNICO: COMPARATIVO ENTRADAS VS SAÍDAS COM VISUALIZAÇÃO APRIMORADA ---
+        st.subheader("📊 Análise Gráfica: Fluxo Financeiro")
         
-        # Gráfico 1: Pizza Comparando Entradas vs Saídas
-        with col_g1:
-            df_totais = pd.DataFrame([
-                {"Fluxo": "Entradas (Receitas)", "Valor": total_entradas},
-                {"Fluxo": "Saídas (Despesas)", "Valor": total_saidas}
-            ])
+        col_graf_centro, col_graf_vazia = st.columns([2, 1])
+        with col_graf_centro:
+            total_movimentado = total_entradas + total_saidas
             
-            fig_pizza_fluxo = px.pie(
-                df_totais, 
-                names="Fluxo", 
-                values="Valor", 
-                title="<b>Comparativo: O que Entrou vs O que Saiu</b>",
-                hole=0.45,
-                color="Fluxo",
-                color_discrete_map={
-                    "Entradas (Receitas)": "#00B050",
-                    "Saídas (Despesas)": "#FF5252"
-                }
-            )
-            fig_pizza_fluxo.update_traces(textinfo="percent+label", textfont_size=13)
-            fig_pizza_fluxo.update_layout(
+            fig = go.Figure(data=[go.Pie(
+                labels=["Entradas (Receitas)", "Saídas (Despesas)"],
+                values=[total_entradas, total_saidas],
+                hole=0.55,
+                marker=dict(
+                    colors=["#00B050", "#FF5252"],
+                    line=dict(color="#121212", width=3)
+                ),
+                textinfo="percent+label",
+                textposition="outside",
+                textfont=dict(size=14, color="#F3E5AB", family="Segoe UI"),
+                hovertemplate="<b>%{label}</b><br>Valor: R$ %{value:,.2f}<br>Proporção: %{percent}<extra></extra>"
+            )])
+            
+            fig.update_layout(
                 paper_bgcolor="#1E1E1E",
                 plot_bgcolor="#1E1E1E",
-                font=dict(color="#F3E5AB"),
-                title_font=dict(color="#D4AF37", size=16),
-                legend=dict(font=dict(color="#F3E5AB"), orientation="h", yanchor="bottom", y=-0.2)
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.15,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(color="#F3E5AB", size=13)
+                ),
+                annotations=[
+                    dict(
+                        text=f"<span style='font-size:12px; color:#C5A059;'>Total Movimentado</span><br><b style='font-size:16px; color:#FFFFFF;'>R$ {total_movimentado:,.2f}</b>",
+                        x=0.5, y=0.5,
+                        font_size=14,
+                        showarrow=False
+                    )
+                ],
+                margin=dict(t=30, b=50, l=20, r=20),
+                height=450
             )
-            st.plotly_chart(fig_pizza_fluxo, use_container_width=True)
-        
-        # Gráfico 2: Pizza de Despesas por Categoria
-        with col_g2:
-            df_despesas = df[df["tipo"] == "Despesa"]
-            if not df_despesas.empty:
-                fig_pizza_cat = px.pie(
-                    df_despesas, 
-                    names="categoria", 
-                    values="valor", 
-                    title="<b>Distribuição de Gastos por Categoria</b>",
-                    hole=0.45,
-                    color_discrete_sequence=['#D4AF37', '#FF5252', '#E67E22', '#3498DB', '#9B59B6', '#1ABC9C', '#F39C12']
-                )
-                fig_pizza_cat.update_traces(textinfo="percent+label", textfont_size=12)
-                fig_pizza_cat.update_layout(
-                    paper_bgcolor="#1E1E1E",
-                    plot_bgcolor="#1E1E1E",
-                    font=dict(color="#F3E5AB"),
-                    title_font=dict(color="#D4AF37", size=16),
-                    legend=dict(font=dict(color="#F3E5AB"), orientation="h", yanchor="bottom", y=-0.2)
-                )
-                st.plotly_chart(fig_pizza_cat, use_container_width=True)
-            else:
-                st.info("Nenhuma despesa registrada para exibir distribuição por categoria.")
+            
+            st.plotly_chart(fig, use_container_width=True)
 
 # --- ABA 3: PLANEJAMENTO FUTURO ---
 with tab_planejamento:
