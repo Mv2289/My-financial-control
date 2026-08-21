@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import json
 import smtplib
+import streamlit.components.v1 as components
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -102,25 +103,6 @@ st.markdown("""
         color: #000000 !important;
         transform: translateY(-1px);
         box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35) !important;
-    }
-
-    div[data-testid="stLinkButton"] > a {
-        background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%) !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 14px 20px !important;
-        font-weight: 700 !important;
-        font-size: 1rem !important;
-        letter-spacing: 0.5px !important;
-        text-align: center !important;
-        box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3) !important;
-        display: block !important;
-    }
-    div[data-testid="stLinkButton"] > a:hover {
-        background: linear-gradient(135deg, #00b0ff 0%, #009ee3 100%) !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(0, 158, 227, 0.5) !important;
     }
 
     button[data-baseweb="tab"] {
@@ -281,6 +263,7 @@ dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gr
 plano_atual = dados_usuario.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
 user_email = dados_usuario.get("email", "")
+eh_master = (usuario_atual in ["Marcos", "admin"])
 
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
@@ -309,29 +292,14 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    menu_selecionado = st.radio(
-        "Menu",
-        ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"],
-        label_visibility="collapsed"
-    )
+    # Lista de Menus (Aba de Gestão exclusiva para Marcos e admin)
+    opcoes_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
+    if eh_master:
+        opcoes_menu.append("👥 Gestão de Usuários")
+        
+    menu_selecionado = st.radio("Menu", opcoes_menu, label_visibility="collapsed")
     
     st.markdown("---")
-    
-    if usuario_atual == "admin":
-        with st.expander("🛡️ Gestão de Usuários (Admin)"):
-            for u, dados in list(st.session_state["usuarios_db"].items()):
-                st.write(f"**{u}** — *{dados['plano']}*")
-                c_a1, c_a2 = st.columns(2)
-                if dados["plano"] != "Pro":
-                    if c_a1.button("Aprovar PRO", key=f"ad_pro_{u}"):
-                        st.session_state["usuarios_db"][u]["plano"] = "Pro"
-                        st.success(f"{u} agora é PRO!")
-                        st.rerun()
-                else:
-                    if u != "admin" and c_a2.button("Tornar Grátis", key=f"ad_down_{u}"):
-                        st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                        st.rerun()
-        st.markdown("---")
         
     if not api_key:
         with st.expander("⚙️ Chave de Integração"):
@@ -630,7 +598,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos estão superando o teto planejado.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (CHECKOUT INSTITUCIONAL)
+# ⭐ ABA 4: ASSINATURA PRO
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("""
@@ -682,21 +650,34 @@ elif menu_selecionado == "⭐ Assinatura PRO":
         st.subheader("💳 Ativação Segura do Plano")
         st.write("Pague de forma 100% segura com **Pix (Aprovação Instantânea)**, **Cartão de Crédito** ou **Débito**:")
         
-        # Botão Nativo sem menção externa
-        st.link_button(
-            "💳 Assinar Plano PRO (R$ 19,90/mês)",
-            url="[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)",
-            use_container_width=True
-        )
+        components.html("""
+            <div style="text-align: center; margin: 10px 0;">
+                <button onclick="window.open('[https://mpago.la/2S7gUKX](https://mpago.la/2S7gUKX)', '_blank')" 
+                        style="width: 100%; 
+                               background: linear-gradient(135deg, #009ee3 0%, #007eb5 100%); 
+                               color: #ffffff; 
+                               border: none; 
+                               border-radius: 8px; 
+                               padding: 14px 20px; 
+                               font-family: 'Inter', sans-serif; 
+                               font-weight: 700; 
+                               font-size: 1rem; 
+                               cursor: pointer; 
+                               box-shadow: 0 4px 15px rgba(0, 158, 227, 0.3);
+                               transition: all 0.2s ease;">
+                    💳 Assinar Plano PRO (R$ 19,90/mês)
+                </button>
+            </div>
+        """, height=65)
         
-        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 10px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #888; font-size: 0.85rem; margin-top: 5px;'>🔒 Ambiente protegido com criptografia bancária</p>", unsafe_allow_html=True)
         st.write("")
         st.markdown("---")
         
         if plano_atual == "Pendente":
             st.warning("⏳ **Sua solicitação de assinatura está em análise pelo administrador.** Assim que o pagamento for verificado, seus recursos PRO serão desbloqueados.")
         else:
-            st.write("**Já realizou o pagamento pelo link acima?**")
+            st.write("**Já realizou o pagamento pelo botão acima?**")
             if st.button("🔔 Informar Pagamento Realizado", use_container_width=True):
                 st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pendente"
                 st.info("Solicitação enviada! O administrador verificará a confirmação do pagamento para liberar o acesso.")
@@ -710,3 +691,53 @@ elif menu_selecionado == "⭐ Assinatura PRO":
                 <p style="color: #aaa; margin: 5px 0 0 0;">Você possui acesso a todos os recursos ilimitados do MFC.</p>
             </div>
         """, unsafe_allow_html=True)
+
+# ==========================================
+# 👥 ABA 5: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA MARCOS / ADMIN)
+# ==========================================
+elif menu_selecionado == "👥 Gestão de Usuários" and eh_master:
+    st.markdown("""
+        <div class="glass-card">
+            <h2 style="margin:0; color:#d4af37;">👥 Painel de Controle de Usuários</h2>
+            <p style="color:#aaa; font-size:0.95rem; margin-top:4px;">
+                Visão exclusiva do administrador para gerenciar contas cadastradas, credenciais e liberar acessos ao plano PRO.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    lista_usuarios = []
+    for nome_u, info_u in st.session_state["usuarios_db"].items():
+        lista_usuarios.append({
+            "Nome de Usuário": nome_u,
+            "E-mail": info_u.get("email", "-"),
+            "Senha": info_u.get("senha", "-"),
+            "Plano Atual": info_u.get("plano", "Gratuito")
+        })
+        
+    df_users = pd.DataFrame(lista_usuarios)
+    st.dataframe(df_users, use_container_width=True, hide_index=True)
+    
+    st.write("")
+    st.markdown("### ⚡ Ações Rápidas de Planos")
+    
+    for u, dados in list(st.session_state["usuarios_db"].items()):
+        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
+        
+        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
+        
+        col_m1.markdown(f"**{u}** — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span>", unsafe_allow_html=True)
+        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
+        
+        if dados["plano"] != "Pro":
+            if col_m2.button("⭐ Ativar / Liberar PRO", key=f"tbl_pro_{u}"):
+                st.session_state["usuarios_db"][u]["plano"] = "Pro"
+                st.success(f"Plano PRO ativado com sucesso para {u}!")
+                st.rerun()
+        else:
+            if u not in ["admin"]:
+                if col_m3.button("❌ Rebaixar para Grátis", key=f"tbl_down_{u}"):
+                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
+                    st.info(f"{u} agora está no plano Básico.")
+                    st.rerun()
+                    
+        st.markdown("---")
