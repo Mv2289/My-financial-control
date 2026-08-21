@@ -3,3 +3,4 @@ pandas
 plotly
 pypdf
 google-generativeai
+mercadopago
