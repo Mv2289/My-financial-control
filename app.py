@@ -5,7 +5,7 @@ import google.generativeai as genai
 import json
 import smtplib
 import mercadopago
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -182,8 +182,20 @@ def checar_status_pagamento(access_token, payment_id):
 # Banco de dados e sessão
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
-        "admin": {"email": "admin@mfc.com", "senha": "admin", "plano": "Pro"},
-        "Marcos": {"email": "marcos@mfc.com", "senha": "1234", "plano": "Gratuito"}
+        "admin": {
+            "email": "admin@mfc.com", 
+            "senha": "admin", 
+            "plano": "Pro", 
+            "data_aquisicao": "01/01/2026", 
+            "data_vencimento": "01/01/2099"
+        },
+        "Marcos": {
+            "email": "marcos@mfc.com", 
+            "senha": "1234", 
+            "plano": "Gratuito", 
+            "data_aquisicao": None, 
+            "data_vencimento": None
+        }
     }
 
 if "autenticado" not in st.session_state:
@@ -200,6 +212,30 @@ if "pix_qr_base64" not in st.session_state:
     st.session_state["pix_qr_base64"] = ""
 if "pix_copia_cola" not in st.session_state:
     st.session_state["pix_copia_cola"] = ""
+
+# Função de checagem e expiração automática de 30 dias
+def verificar_expiracao_assinaturas():
+    hoje = datetime.now().date()
+    for u, dados in st.session_state["usuarios_db"].items():
+        if u != "admin" and dados.get("plano") == "Pro":
+            dt_venc_str = dados.get("data_vencimento")
+            if dt_venc_str:
+                try:
+                    dt_venc = datetime.strptime(dt_venc_str, "%d/%m/%Y").date()
+                    if hoje > dt_venc:
+                        st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
+                except Exception:
+                    pass
+
+verificar_expiracao_assinaturas()
+
+# Ativação do Plano PRO com ciclo de 30 dias
+def ativar_plano_pro(nome_usuario):
+    hoje = datetime.now()
+    vencimento = hoje + timedelta(days=30)
+    st.session_state["usuarios_db"][nome_usuario]["plano"] = "Pro"
+    st.session_state["usuarios_db"][nome_usuario]["data_aquisicao"] = hoje.strftime("%d/%m/%Y")
+    st.session_state["usuarios_db"][nome_usuario]["data_vencimento"] = vencimento.strftime("%d/%m/%Y")
 
 # Tela de Autenticação
 def tela_autenticacao():
@@ -246,7 +282,9 @@ def tela_autenticacao():
                     st.session_state["usuarios_db"][novo_usuario] = {
                         "email": novo_email,
                         "senha": nova_senha,
-                        "plano": "Gratuito"
+                        "plano": "Gratuito",
+                        "data_aquisicao": None,
+                        "data_vencimento": None
                     }
                     _, msg_email = enviar_email_boas_vindas(novo_email, novo_usuario)
                     st.success("Conta registrada com sucesso! " + str(msg_email))
@@ -438,10 +476,7 @@ elif menu_selecionado == "dashboard":
         total_entradas = float(df_rec["valor"].sum())
         total_saidas = float(df_des["valor"].sum())
         saldo_liquido = total_entradas - total_saidas
-        if total_entradas > 0:
-            taxa_poupanca = (saldo_liquido / total_entradas) * 100.0
-        else:
-            taxa_poupanca = 0.0
+        taxa_poupanca = ((saldo_liquido / total_entradas) * 100.0) if total_entradas > 0 else 0.0
         cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
 
         k1, k2, k3, k4 = st.columns(4)
@@ -452,50 +487,50 @@ elif menu_selecionado == "dashboard":
         
         st.write("")
         st.write("")
-        c_tab, c_graf = st.columns([1.4, 1.0])
         
+        # Filtros de busca
+        st.markdown("### 📋 Lançamentos Conciliados")
+        f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
+        with f1:
+            busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
+        with f2:
+            filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
+        with f3:
+            ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
+        with f4:
+            min_dt = df_raw["data_dt"].min()
+            max_dt = df_raw["data_dt"].max()
+            if pd.isna(min_dt) or pd.isna(max_dt):
+                min_val, max_val = datetime.today().date(), datetime.today().date()
+            else:
+                min_val, max_val = min_dt.date(), max_dt.date()
+                
+            intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
+
+        df_filtrado = df_raw.copy()
+        
+        if busca:
+            df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
+        if filtro_tipo == "Receitas":
+            df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
+        elif filtro_tipo == "Despesas":
+            df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
+
+        if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
+            d_ini, d_fim = intervalo_data
+            df_filtrado = df_filtrado[(df_filtrado["data_dt"].dt.date >= d_ini) & (df_filtrado["data_dt"].dt.date <= d_fim)]
+
+        if ordem == "Mais Recentes":
+            df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
+        elif ordem == "Mais Antigos":
+            df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=True)
+        elif ordem == "Maior Valor":
+            df_filtrado = df_filtrado.sort_values(by="valor", ascending=False)
+        elif ordem == "Menor Valor":
+            df_filtrado = df_filtrado.sort_values(by="valor", ascending=True)
+
+        c_tab, c_pie = st.columns([1.35, 0.95])
         with c_tab:
-            st.markdown("### 📋 Lançamentos Conciliados")
-            
-            f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
-            with f1:
-                busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
-            with f2:
-                filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
-            with f3:
-                ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
-            with f4:
-                min_dt = df_raw["data_dt"].min()
-                max_dt = df_raw["data_dt"].max()
-                if pd.isna(min_dt) or pd.isna(max_dt):
-                    min_val, max_val = datetime.today().date(), datetime.today().date()
-                else:
-                    min_val, max_val = min_dt.date(), max_dt.date()
-                    
-                intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
-
-            df_filtrado = df_raw.copy()
-            
-            if busca:
-                df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
-            if filtro_tipo == "Receitas":
-                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
-            elif filtro_tipo == "Despesas":
-                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
-
-            if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
-                d_ini, d_fim = intervalo_data
-                df_filtrado = df_filtrado[(df_filtrado["data_dt"].dt.date >= d_ini) & (df_filtrado["data_dt"].dt.date <= d_fim)]
-
-            if ordem == "Mais Recentes":
-                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
-            elif ordem == "Mais Antigos":
-                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=True)
-            elif ordem == "Maior Valor":
-                df_filtrado = df_filtrado.sort_values(by="valor", ascending=False)
-            elif ordem == "Menor Valor":
-                df_filtrado = df_filtrado.sort_values(by="valor", ascending=True)
-
             df_render = df_filtrado[["data", "descricao", "tipo", "valor"]].copy()
             st.dataframe(
                 df_render,
@@ -510,10 +545,10 @@ elif menu_selecionado == "dashboard":
                 height=380
             )
             
-        with c_graf:
-            st.markdown("### 📊 Proporção de Fluxo")
+        with c_pie:
+            st.markdown("##### 🍩 Proporção de Fluxo")
             total_vol = total_entradas + total_saidas
-            fig = go.Figure(data=[go.Pie(
+            fig_pie = go.Figure(data=[go.Pie(
                 labels=["Receitas", "Despesas"],
                 values=[total_entradas, total_saidas],
                 hole=0.62,
@@ -521,16 +556,90 @@ elif menu_selecionado == "dashboard":
                 textinfo="percent",
                 textfont=dict(size=14, color="#ffffff", family="Inter")
             )])
-            fig.update_layout(
+            fig_pie.update_layout(
                 paper_bgcolor="#0f1117",
                 plot_bgcolor="#0f1117",
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(color="#e5e5e5", size=12)),
                 annotations=[dict(text="<span style='font-size:11px; color:#888;'>TOTAL</span><br><b style='font-size:16px; color:#fff;'>R$ {:,.2f}</b>".format(total_vol), x=0.5, y=0.5, font_size=14, showarrow=False)],
                 margin=dict(t=10, b=30, l=10, r=10),
-                height=450
+                height=340
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+        # ==========================================
+        # NOVO: GRÁFICO COMPARATIVO EM ESCALA (BARRAS AGRUPADAS + TOTAL)
+        # ==========================================
+        st.write("")
+        st.markdown("### 📊 Evolução Mensal e Comparativo de Gastos")
+        
+        df_evol = df_raw.dropna(subset=["data_dt"]).copy()
+        df_evol["mes_ano_period"] = df_evol["data_dt"].dt.to_period("M")
+        
+        meses_unicos = sorted(df_evol["mes_ano_period"].unique())
+        
+        if len(meses_unicos) > 0:
+            meses_labels = [m.strftime("%b/%y").capitalize() for m in meses_unicos]
+            receitas_mes = []
+            despesas_mes = []
+            
+            for m in meses_unicos:
+                df_m = df_evol[df_evol["mes_ano_period"] == m]
+                rec = float(df_m[df_m["tipo"] == "Receita"]["valor"].sum())
+                des = float(df_m[df_m["tipo"] == "Despesa"]["valor"].sum())
+                receitas_mes.append(rec)
+                despesas_mes.append(des)
+                
+            # Adiciona a coluna final de "Total" (conforme solicitado na imagem)
+            labels_com_total = meses_labels + ["Total"]
+            receitas_com_total = receitas_mes + [total_entradas]
+            despesas_com_total = despesas_mes + [total_saidas]
+            
+            fig_barras = go.Figure()
+            
+            # Barra de Receitas (Verde)
+            fig_barras.add_trace(go.Bar(
+                name="Receitas / Ganhos",
+                x=labels_com_total,
+                y=receitas_com_total,
+                marker=dict(color="#00e676", line=dict(color="rgba(0,230,118,0.3)", width=1)),
+                text=[f"R$ {v:,.0f}" if v > 0 else "" for v in receitas_com_total],
+                textposition="outside",
+                textfont=dict(color="#00e676", size=11, family="Inter")
+            ))
+            
+            # Barra de Despesas (Vermelha)
+            fig_barras.add_trace(go.Bar(
+                name="Despesas / Gastos",
+                x=labels_com_total,
+                y=despesas_com_total,
+                marker=dict(color="#ff5252", line=dict(color="rgba(255,82,82,0.3)", width=1)),
+                text=[f"R$ {v:,.0f}" if v > 0 else "" for v in despesas_com_total],
+                textposition="outside",
+                textfont=dict(color="#ff5252", size=11, family="Inter")
+            ))
+            
+            fig_barras.update_layout(
+                barmode="group",
+                bargap=0.25,
+                bargroupgap=0.1,
+                paper_bgcolor="#0f1117",
+                plot_bgcolor="#0f1117",
+                font=dict(color="#e5e5e5", family="Inter"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
+                margin=dict(t=40, b=30, l=20, r=20),
+                yaxis=dict(
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.05)",
+                    zerolinecolor="rgba(255,255,255,0.1)",
+                    tickprefix="R$ "
+                ),
+                xaxis=dict(
+                    showgrid=False
+                ),
+                height=430
+            )
+            st.plotly_chart(fig_barras, use_container_width=True)
 
 # ==========================================
 # 💬 ABA: CONSULTOR IA (PRO)
@@ -638,7 +747,7 @@ elif menu_selecionado == "assinatura":
             "<ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'>"
             "<li>✔ 1 Upload por vez</li>"
             "<li>✔ Resumo de entradas e saídas</li>"
-            "<li>✔ Gráficos de proporção</li>"
+            "<li>✔ Gráficos de proporção e escala</li>"
             "<li>✖ Consultor Financeiro com IA (Chat)</li>"
             "<li>✖ Multi-upload simultâneo</li>"
             "<li>✖ Aba de Planejamento Futuro</li>"
@@ -693,11 +802,11 @@ elif menu_selecionado == "assinatura":
             if st.session_state["pix_payment_id"] and mp_access_token:
                 status = checar_status_pagamento(mp_access_token, st.session_state["pix_payment_id"])
                 if status == "approved":
-                    st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
+                    ativar_plano_pro(usuario_atual)
                     st.session_state["pix_qr_base64"] = ""
                     st.session_state["pix_payment_id"] = None
                     st.balloons()
-                    st.success("🎉 Pagamento de R$ 19,90 confirmado! Seu Plano PRO foi liberado automaticamente.")
+                    st.success("🎉 Pagamento de R$ 19,90 confirmado! Seu Plano PRO foi liberado automaticamente por 30 dias.")
                     st.rerun()
                 else:
                     st.info("⏳ Aguardando pagamento do Pix de R$ 19,90... O sistema liberará o acesso automaticamente assim que o banco confirmar.")
@@ -712,15 +821,39 @@ elif menu_selecionado == "assinatura":
 # 👥 ABA 6: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA ADMIN)
 # ==========================================
 elif menu_selecionado == "usuarios" and eh_admin:
-    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão exclusiva do administrador (admin).</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão administrativa de contas, vigências e controle de planos.</p></div>", unsafe_allow_html=True)
     
     lista_usuarios = []
+    hoje = datetime.now().date()
+    
     for nome_u, info_u in st.session_state["usuarios_db"].items():
+        plano = info_u.get("plano", "Gratuito")
+        dt_aquisicao = info_u.get("data_aquisicao") or "-"
+        dt_vencimento = info_u.get("data_vencimento") or "-"
+        
+        status_vigencia = "Sem Plano"
+        if plano == "Pro":
+            if nome_u == "admin":
+                status_vigencia = "🟢 Vitalício (Admin)"
+            elif dt_vencimento != "-":
+                try:
+                    d_venc = datetime.strptime(dt_vencimento, "%d/%m/%Y").date()
+                    dias_restantes = (d_venc - hoje).days
+                    if dias_restantes >= 0:
+                        status_vigencia = f"🟢 Ativo ({dias_restantes} dias)"
+                    else:
+                        status_vigencia = "🔴 Vencido"
+                except Exception:
+                    status_vigencia = "🟢 Ativo"
+        
         lista_usuarios.append({
-            "Nome de Usuário": nome_u,
+            "Usuário": nome_u,
             "E-mail": info_u.get("email", "-"),
             "Senha": info_u.get("senha", "-"),
-            "Plano Atual": info_u.get("plano", "Gratuito")
+            "Plano Atual": plano,
+            "Data Aquisição": dt_aquisicao,
+            "Data Vencimento": dt_vencimento,
+            "Vigência": status_vigencia
         })
         
     df_users = pd.DataFrame(lista_usuarios)
@@ -729,21 +862,24 @@ elif menu_selecionado == "usuarios" and eh_admin:
     st.markdown("### ⚡ Ações Rápidas de Planos")
     
     for u, dados in list(st.session_state["usuarios_db"].items()):
-        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
-        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
-        col_m1.markdown("<b>" + str(u) + "</b> — <span style='color:" + str(status_color) + "; font-weight:bold;'>" + str(dados['plano']) + "</span>", unsafe_allow_html=True)
-        col_m1.caption("E-mail: " + str(dados.get('email', '-')))
+        col_m1, col_m2, col_m3 = st.columns([2.5, 1.2, 1.2])
+        status_color = "#00e676" if dados['plano'] == 'Pro' else "#888888"
+        venc_texto = f" (Vence: {dados.get('data_vencimento')})" if dados.get('data_vencimento') and u != 'admin' else ""
+        
+        col_m1.markdown(f"<b>{u}</b> — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span><small style='color:#aaa;'>{venc_texto}</small>", unsafe_allow_html=True)
+        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
         
         if dados["plano"] != "Pro":
-            if col_m2.button("⭐ Ativar PRO", key="btn_pro_" + str(u)):
-                st.session_state["usuarios_db"][u]["plano"] = "Pro"
-                st.success(str(u) + " agora é PRO!")
+            if col_m2.button("⭐ Ativar 30 Dias", key="btn_pro_" + str(u)):
+                ativar_plano_pro(u)
+                st.success(f"{u} agora é PRO por 30 dias!")
                 st.rerun()
         else:
             if u not in ["admin"]:
                 if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
                     st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                    st.info(str(u) + " voltou ao Básico.")
+                    st.session_state["usuarios_db"][u]["data_vencimento"] = None
+                    st.info(f"{u} voltou ao Básico.")
                     st.rerun()
                     
         st.markdown("---")
