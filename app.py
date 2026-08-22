@@ -19,7 +19,7 @@ st.set_page_config(
 # Estilo institucional XP / Private Banking Premium com Redesign Moderno do Menu Lateral
 css_style = """
 <style>
-    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     
     html, body, [class*='css'], .stApp {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -127,12 +127,10 @@ css_style = """
         gap: 8px;
     }
     
-    /* Remove a bolinha padrao do radio */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
         display: none !important;
     }
     
-    /* Transforma cada item num botao de navegacao moderno */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label {
         background: rgba(255, 255, 255, 0.02) !important;
         border: 1px solid rgba(255, 255, 255, 0.05) !important;
@@ -146,21 +144,18 @@ css_style = """
         margin: 0 !important;
     }
     
-    /* Efeito Hover suave */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
         background: rgba(212, 175, 55, 0.06) !important;
         border-color: rgba(212, 175, 55, 0.25) !important;
         transform: translateX(3px);
     }
     
-    /* Estilo do item Ativo / Selecionado */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
         background: linear-gradient(90deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.04)) !important;
         border: 1px solid #d4af37 !important;
         box-shadow: 0 0 16px rgba(212, 175, 55, 0.15) !important;
     }
     
-    /* Texto das Abas */
     div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
         color: #a0a0a5 !important;
         font-size: 0.92rem !important;
@@ -174,7 +169,6 @@ css_style = """
         font-weight: 700 !important;
     }
     
-    /* Bloqueio de menus de tabela e escrita indesejada em dropdown */
     div[data-baseweb="select"] input {
         caret-color: transparent !important;
         cursor: pointer !important;
@@ -238,7 +232,7 @@ def criar_cobranca_pix(access_token, email_cliente, nome_cliente, valor=19.90):
         "payment_method_id": "pix",
         "payer": {
             "email": email_valido,
-            "first_name": primeiro_nome
+            "first_name": primer_nome := primeiro_nome
         }
     }
     payment_response = sdk.payment().create(payment_data)
@@ -397,14 +391,8 @@ with st.sidebar:
     st.markdown("<div style='padding: 8px 0 16px 0; text-align: center;'><div class='brand-title' style='font-size: 2.3rem;'>MFC</div><div class='brand-subtitle'>MY FINANCIAL CONTROL</div></div>", unsafe_allow_html=True)
     
     badge_html = '<span class="pro-tag">★ PLANO PRO</span>' if eh_pro else '<span style="background:rgba(255,255,255,0.05); color:#888; font-size:0.72rem; padding:3px 10px; border-radius:12px; font-weight:600;">PLANO BÁSICO</span>'
-    st.markdown(f"""
-    <div class="user-profile-card">
-        <div style="font-size: 0.68rem; color: #73737a; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Conta Ativa</div>
-        <div style="font-weight: 800; font-size: 1.12rem; color: #ffffff; margin-top: 2px;">{usuario_atual}</div>
-        <div style="font-size: 0.76rem; color: #948d70; margin: 2px 0 10px 0; word-break: break-all;">{user_email}</div>
-        {badge_html}
-    </div>
-    """, unsafe_allow_html=True)
+    card_perfil_html = "<div class='user-profile-card'><div style='font-size: 0.68rem; color: #73737a; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;'>Conta Ativa</div><div style='font-weight: 800; font-size: 1.12rem; color: #ffffff; margin-top: 2px;'>" + str(usuario_atual) + "</div><div style='font-size: 0.76rem; color: #948d70; margin: 2px 0 10px 0; word-break: break-all;'>" + str(user_email) + "</div>" + badge_html + "</div>"
+    st.markdown(card_perfil_html, unsafe_allow_html=True)
     
     rotas_chaves = ["upload", "dashboard", "chat_ia", "planejamento", "assinatura"]
     mapa_titulos = {
@@ -508,10 +496,10 @@ def responder_chat_consultor(chave_api, transacoes_lista, historico_chat, pergun
     
     modelos = ["models/gemini-3.6-flash", "gemini-3.6-flash", "models/gemini-2.0-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
     
-    prompt_conversa = system_instruction + "\n\nHISTÓRICO DA CONVERSA:\n"
+    prompt_conversa = system_instruction + chr(10) + chr(10) + "HISTÓRICO DA CONVERSA:" + chr(10)
     for msg in historico_chat:
-        prompt_conversa += str(msg["role"]).upper() + ": " + str(msg["content"]) + "\n"
-    prompt_conversa += "USER: " + str(pergunta_usuario) + "\nASSISTANT:"
+        prompt_conversa += str(msg["role"]).upper() + ": " + str(msg["content"]) + chr(10)
+    prompt_conversa += "USER: " + str(pergunta_usuario) + chr(10) + "ASSISTANT:"
     
     for mod in modelos:
         try:
@@ -668,22 +656,47 @@ elif menu_selecionado == "dashboard":
         with c_pie:
             st.markdown("##### 📊 Proporção de Fluxo")
             total_vol = total_entradas + total_saidas
+            
+            # Gráfico de Rosca Ultra Moderno (Cores Refinadas + Layout Sem Fundo Duro + Tipografia Premium)
             fig_pie = go.Figure(data=[go.Pie(
                 labels=["Receitas", "Despesas"],
                 values=[total_entradas, total_saidas],
-                hole=0.62,
-                marker=dict(colors=["#00e676", "#ff5252"], line=dict(color="#08090b", width=3)),
+                hole=0.68,
+                marker=dict(
+                    colors=["#00e676", "#ff4343"],
+                    line=dict(color="#08090b", width=3)
+                ),
                 textinfo="percent",
-                textfont=dict(size=14, color="#ffffff", family="Plus Jakarta Sans")
+                textposition="inside",
+                insidetextorientation="horizontal",
+                textfont=dict(size=14, color="#ffffff", family="Plus Jakarta Sans", weight="bold"),
+                sort=False,
+                direction="clockwise"
             )])
+            
             fig_pie.update_layout(
-                paper_bgcolor="#0f1117",
-                plot_bgcolor="#0f1117",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
                 showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(color="#e5e5e5", size=12)),
-                annotations=[dict(text="<span style='font-size:11px; color:#888;'>TOTAL</span><br><b style='font-size:16px; color:#fff;'>R$ {:,.2f}</b>".format(total_vol), x=0.5, y=0.5, font_size=14, showarrow=False)],
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.12,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(color="#a0a0a5", size=12, family="Plus Jakarta Sans"),
+                    itemgap=20
+                ),
+                annotations=[
+                    dict(
+                        text="<span style='font-size:11px; color:#8c8568; letter-spacing:1px; font-weight:700;'>VOLUME TOTAL</span><br><b style='font-size:18px; color:#ffffff; font-family:Plus Jakarta Sans;'>R$ {:,.2f}</b>".format(total_vol),
+                        x=0.5, y=0.5,
+                        font_size=14,
+                        showarrow=False
+                    )
+                ],
                 margin=dict(t=10, b=30, l=10, r=10),
-                height=340
+                height=360
             )
             st.plotly_chart(fig_pie, use_container_width=True)
 
