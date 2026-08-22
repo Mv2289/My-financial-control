@@ -16,22 +16,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo institucional XP com bloqueio de escrita em select e menus de tabela
+# Estilo institucional XP / Private Banking Premium com Redesign Moderno do Menu Lateral
 css_style = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
+    
     html, body, [class*='css'], .stApp {
-        font-family: 'Inter', sans-serif !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
         background-color: #08090b !important;
         color: #e5e5e5 !important;
     }
+    
     section[data-testid='stSidebar'] {
-        background-color: #0d0f14 !important;
-        border-right: 1px solid rgba(212, 175, 55, 0.12) !important;
+        background-color: #0c0e12 !important;
+        border-right: 1px solid rgba(212, 175, 55, 0.1) !important;
     }
+    
     .brand-title {
-        font-size: 2.8rem;
-        font-weight: 900;
+        font-size: 2.6rem;
+        font-weight: 800;
         letter-spacing: 2px;
         color: #d4af37;
         margin: 0;
@@ -39,18 +42,28 @@ css_style = """
         text-align: center;
     }
     .brand-subtitle {
-        font-size: 0.78rem;
+        font-size: 0.72rem;
         letter-spacing: 4px;
         text-transform: uppercase;
-        color: #9e9575;
+        color: #8c8568;
         margin-top: 4px;
         font-weight: 600;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
     }
+    
+    .user-profile-card {
+        background: linear-gradient(145deg, rgba(22, 25, 34, 0.8), rgba(14, 16, 22, 0.95));
+        border: 1px solid rgba(212, 175, 55, 0.18);
+        border-radius: 14px;
+        padding: 18px 16px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
     .glass-card {
-        background: rgba(18, 20, 26, 0.7);
-        border: 1px solid rgba(212, 175, 55, 0.15);
+        background: rgba(18, 20, 26, 0.75);
+        border: 1px solid rgba(212, 175, 55, 0.14);
         border-radius: 14px;
         padding: 24px;
         margin-bottom: 20px;
@@ -63,7 +76,7 @@ css_style = """
         text-align: center;
     }
     .kpi-label {
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -75,39 +88,93 @@ css_style = """
         font-weight: 800;
         margin: 0;
     }
+    
     div.stButton > button {
         background: #d4af37 !important;
         color: #08090b !important;
         border: 1px solid #d4af37 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         padding: 10px 20px !important;
         font-weight: 700 !important;
+        transition: all 0.2s ease !important;
     }
     div.stButton > button:hover {
         background: #e6c35c !important;
         border-color: #e6c35c !important;
         color: #000000 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25) !important;
     }
+    
     .pro-tag {
-        background: rgba(212, 175, 55, 0.15);
+        background: rgba(212, 175, 55, 0.12);
         color: #d4af37;
-        border: 1px solid #d4af37;
+        border: 1px solid rgba(212, 175, 55, 0.45);
         font-size: 0.72rem;
         font-weight: 700;
-        padding: 3px 10px;
+        padding: 4px 12px;
         border-radius: 20px;
         display: inline-block;
+        letter-spacing: 0.5px;
     }
-    .pending-tag {
-        background: rgba(255, 193, 7, 0.15);
-        color: #ffc107;
-        border: 1px solid #ffc107;
-        font-size: 0.72rem;
-        font-weight: 700;
-        padding: 3px 10px;
-        border-radius: 20px;
-        display: inline-block;
+    
+    /* ==========================================
+       REDESIGN DO MENU LATERAL (SEM BOLINHAS)
+       ========================================== */
+    div[data-testid="stRadio"] > div[role="radiogroup"] {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
+    
+    /* Remove a bolinha padrao do radio */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
+    }
+    
+    /* Transforma cada item num botao de navegacao moderno */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding: 11px 16px !important;
+        border-radius: 10px !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        margin: 0 !important;
+    }
+    
+    /* Efeito Hover suave */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+        background: rgba(212, 175, 55, 0.06) !important;
+        border-color: rgba(212, 175, 55, 0.25) !important;
+        transform: translateX(3px);
+    }
+    
+    /* Estilo do item Ativo / Selecionado */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) {
+        background: linear-gradient(90deg, rgba(212, 175, 55, 0.16), rgba(212, 175, 55, 0.04)) !important;
+        border: 1px solid #d4af37 !important;
+        box-shadow: 0 0 16px rgba(212, 175, 55, 0.15) !important;
+    }
+    
+    /* Texto das Abas */
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+        color: #a0a0a5 !important;
+        font-size: 0.92rem !important;
+        font-weight: 500 !important;
+        margin: 0 !important;
+        letter-spacing: 0.2px !important;
+    }
+    
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p {
+        color: #d4af37 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Bloqueio de menus de tabela e escrita indesejada em dropdown */
     div[data-baseweb="select"] input {
         caret-color: transparent !important;
         cursor: pointer !important;
@@ -327,26 +394,33 @@ mp_access_token = st.secrets.get("MP_ACCESS_TOKEN", "")
 
 # Barra Lateral
 with st.sidebar:
-    st.markdown("<div style='padding: 10px 0 20px 0; text-align: center;'><div class='brand-title' style='font-size: 2.2rem;'>MFC</div><div class='brand-subtitle' style='font-size: 0.65rem;'>MY FINANCIAL CONTROL</div></div>", unsafe_allow_html=True)
+    st.markdown("<div style='padding: 8px 0 16px 0; text-align: center;'><div class='brand-title' style='font-size: 2.3rem;'>MFC</div><div class='brand-subtitle'>MY FINANCIAL CONTROL</div></div>", unsafe_allow_html=True)
     
-    badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
-    st.markdown("<div style='background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;'><div style='font-size: 0.72rem; color: #777; text-transform: uppercase;'>Usuário</div><div style='font-weight: 700; font-size: 1.05rem; color: #ffffff;'>" + str(usuario_atual) + "</div><div style='font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;'>" + str(user_email) + "</div>" + badge_html + "</div>", unsafe_allow_html=True)
+    badge_html = '<span class="pro-tag">★ PLANO PRO</span>' if eh_pro else '<span style="background:rgba(255,255,255,0.05); color:#888; font-size:0.72rem; padding:3px 10px; border-radius:12px; font-weight:600;">PLANO BÁSICO</span>'
+    st.markdown(f"""
+    <div class="user-profile-card">
+        <div style="font-size: 0.68rem; color: #73737a; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Conta Ativa</div>
+        <div style="font-weight: 800; font-size: 1.12rem; color: #ffffff; margin-top: 2px;">{usuario_atual}</div>
+        <div style="font-size: 0.76rem; color: #948d70; margin: 2px 0 10px 0; word-break: break-all;">{user_email}</div>
+        {badge_html}
+    </div>
+    """, unsafe_allow_html=True)
     
     rotas_chaves = ["upload", "dashboard", "chat_ia", "planejamento", "assinatura"]
     mapa_titulos = {
-        "upload": "📥 Upload de Extratos",
-        "dashboard": "📊 Dashboard & Métricas",
-        "chat_ia": "💬 Consultor IA (PRO)",
-        "planejamento": "🔮 Planejamento Futuro",
-        "assinatura": "⭐ Assinatura PRO"
+        "upload": "📥  Upload de Extratos",
+        "dashboard": "📊  Dashboard & Métricas",
+        "chat_ia": "💬  Consultor IA (PRO)",
+        "planejamento": "🎯  Planejamento Estratégico",
+        "assinatura": "⭐  Assinatura PRO"
     }
     
     if eh_admin:
         rotas_chaves.append("usuarios")
-        mapa_titulos["usuarios"] = "👥 Gestão de Usuários"
+        mapa_titulos["usuarios"] = "👥  Gestão de Usuários"
         
     menu_selecionado = st.radio("Menu", rotas_chaves, format_func=lambda x: mapa_titulos[x], label_visibility="collapsed")
-    st.markdown("---")
+    st.markdown("<div style='margin: 16px 0;'></div>", unsafe_allow_html=True)
         
     if not api_key:
         with st.expander("⚙️ Chave de Integração"):
@@ -600,7 +674,7 @@ elif menu_selecionado == "dashboard":
                 hole=0.62,
                 marker=dict(colors=["#00e676", "#ff5252"], line=dict(color="#08090b", width=3)),
                 textinfo="percent",
-                textfont=dict(size=14, color="#ffffff", family="Inter")
+                textfont=dict(size=14, color="#ffffff", family="Plus Jakarta Sans")
             )])
             fig_pie.update_layout(
                 paper_bgcolor="#0f1117",
@@ -652,7 +726,7 @@ elif menu_selecionado == "dashboard":
                 marker=dict(color="#00e676", line=dict(color="rgba(0,230,118,0.3)", width=1)),
                 text=[f"R$ {v:,.0f}" if v > 0 else "" for v in receitas_com_total],
                 textposition="outside",
-                textfont=dict(color="#00e676", size=11, family="Inter")
+                textfont=dict(color="#00e676", size=11, family="Plus Jakarta Sans")
             ))
             
             fig_barras.add_trace(go.Bar(
@@ -662,7 +736,7 @@ elif menu_selecionado == "dashboard":
                 marker=dict(color="#ff5252", line=dict(color="rgba(255,82,82,0.3)", width=1)),
                 text=[f"R$ {v:,.0f}" if v > 0 else "" for v in despesas_com_total],
                 textposition="outside",
-                textfont=dict(color="#ff5252", size=11, family="Inter")
+                textfont=dict(color="#ff5252", size=11, family="Plus Jakarta Sans")
             ))
             
             fig_barras.update_layout(
@@ -671,7 +745,7 @@ elif menu_selecionado == "dashboard":
                 bargroupgap=0.1,
                 paper_bgcolor="#0f1117",
                 plot_bgcolor="#0f1117",
-                font=dict(color="#e5e5e5", family="Inter"),
+                font=dict(color="#e5e5e5", family="Plus Jakarta Sans"),
                 legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
                 margin=dict(t=40, b=30, l=20, r=20),
                 yaxis=dict(
@@ -740,14 +814,14 @@ elif menu_selecionado == "chat_ia":
                     st.session_state["chat_mensagens"].append({"role": "assistant", "content": resposta_ia})
 
 # ==========================================
-# 🔮 ABA 4: PLANEJAMENTO FUTURO
+# 🎯 ABA 4: PLANEJAMENTO ESTRATÉGICO
 # ==========================================
 elif menu_selecionado == "planejamento":
     if not eh_pro:
         st.markdown(
             "<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'>"
             "<div class='pro-tag'>Recurso Exclusivo PRO</div>"
-            "<h2 style='color: #d4af37; margin: 15px 0 10px 0;'>🔮 Planejamento Orçamentário</h2>"
+            "<h2 style='color: #d4af37; margin: 15px 0 10px 0;'>🎯 Planejamento Orçamentário</h2>"
             "<p style='color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;'>"
             "Projete metas para os próximos meses e acompanhe sua capacidade de investimento."
             "</p>"
@@ -756,7 +830,7 @@ elif menu_selecionado == "planejamento":
             unsafe_allow_html=True
         )
     else:
-        st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>🔮 Planejamento Orçamentário Estratégico</h2></div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>🎯 Planejamento Orçamentário Estratégico</h2></div>", unsafe_allow_html=True)
         col_p1, col_p2 = st.columns(2)
         with col_p1:
             st.markdown("#### 🎯 Metas de Gastos")
@@ -792,31 +866,13 @@ elif menu_selecionado == "assinatura":
             "<h3 style='color:#888 !important; margin-top:0;'>Básico</h3>"
             "<h2 style='color:#fff !important; font-size:1.8rem;'>Grátis</h2>"
             "<hr style='border-color: rgba(255,255,255,0.06);'>"
-            "<ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'>"
-            "<li>✔ 1 Upload por vez</li>"
-            "<li>✔ Resumo de entradas e saídas</li>"
-            "<li>✔ Gráficos de proporção e escala</li>"
-            "<li>✖ Consultor Financeiro com IA (Chat)</li>"
-            "<li>✖ Multi-upload simultâneo</li>"
-            "<li>✖ Aba de Planejamento Futuro</li>"
-            "</ul></div>",
+            "<ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ 1 Upload por vez</li><li>✔ Resumo de entradas e saídas</li><li>✔ Gráficos de proporção e escala</li><li>✖ Consultor Financeiro com IA (Chat)</li><li>✖ Multi-upload simultâneo</li><li>✖ Aba de Planejamento Estratégico</li></ul></div>",
             unsafe_allow_html=True
         )
         
     with col_c2:
         st.markdown(
-            "<div class='glass-card' style='border: 2px solid #d4af37;'>"
-            "<div class='pro-tag'>Recomendado</div>"
-            "<h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3>"
-            "<h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 19,90 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ mês</span></h2>"
-            "<hr style='border-color: rgba(212,175,55,0.2);'>"
-            "<ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'>"
-            "<li>✔ <b>Consultor Financeiro IA (Chat Interativo)</b></li>"
-            "<li>✔ Upload de múltiplos PDFs</li>"
-            "<li>✔ Módulo de Planejamento Futuro</li>"
-            "<li>✔ Sem limites de uso</li>"
-            "<li>✔ Processamento acelerado</li>"
-            "</ul></div>",
+            "<div class='glass-card' style='border: 2px solid #d4af37;'><div class='pro-tag'>Recomendado</div><h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3><h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 19,90 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ mês</span></h2><hr style='border-color: rgba(212,175,55,0.2);'><ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ <b>Consultor Financeiro IA (Chat Interativo)</b></li><li>✔ Upload de múltiplos PDFs</li><li>✔ Módulo de Planejamento Estratégico</li><li>✔ Sem limites de uso</li><li>✔ Processamento acelerado</li></ul></div>",
             unsafe_allow_html=True
         )
         
