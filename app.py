@@ -19,7 +19,7 @@ st.set_page_config(
 # Estilo institucional XP / Private Banking Premium com Redesign Moderno do Menu Lateral
 css_style = """
 <style>
-    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     
     html, body, [class*='css'], .stApp {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -169,6 +169,16 @@ css_style = """
         font-weight: 700 !important;
     }
     
+    /* Garante que o botao de abrir/fechar o menu lateral fique SEMPRE visivel */
+    [data-testid="collapsedControl"],
+    button[data-testid="stSidebarCollapseButton"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        color: #d4af37 !important;
+        z-index: 999999 !important;
+    }
+    
     div[data-baseweb="select"] input {
         caret-color: transparent !important;
         cursor: pointer !important;
@@ -187,7 +197,7 @@ css_style = """
         visibility: hidden !important;
         pointer-events: none !important;
     }
-    #MainMenu, footer, header {
+    #MainMenu, footer {
         visibility: hidden !important;
     }
 </style>
