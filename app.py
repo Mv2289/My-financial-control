@@ -182,7 +182,7 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# Motor IA
+# Motor IA com fallback automático de versões de modelo
 def processar_extrato_pdf(file, chave_api):
     reader = PdfReader(file)
     texto_extrato = ""
@@ -190,12 +190,36 @@ def processar_extrato_pdf(file, chave_api):
         texto_extrato += page.extract_text() or ""
         
     if not texto_extrato.strip():
-        raise Exception("Não foi possível extrair texto do PDF.")
+        raise Exception("Não foi possível extrair texto do PDF. O arquivo pode estar protegido ou conter imagem digitalizada.")
 
     genai.configure(api_key=chave_api)
-    prompt = f"Analise o extrato financeiro e extraia rigorosamente todas as movimentações. Retorne EXCLUSIVAMENTE um array JSON contendo objetos no formato: [{{'data':'DD/MM/AAAA','descricao':'Nome','tipo':'Receita' ou 'Despesa','valor':150.50}}]. EXTRATO: {texto_extrato}"
-    m = genai.GenerativeModel(model_name="gemini-2.5-flash", generation_config={"response_mime_type": "application/json"})
-    response = m.generate_content(prompt)
+    prompt = f"Analise rigorosamente o extrato financeiro e retorne EXCLUSIVAMENTE um array JSON contendo objetos no formato: [{{\"data\":\"DD/MM/AAAA\",\"descricao\":\"Nome\",\"tipo\":\"Receita\" ou \"Despesa\",\"valor\":150.50}}]. EXTRATO: {texto_extrato}"
+    
+    modelos_para_testar = [
+        "models/gemini-3.6-flash",
+        "gemini-3.6-flash",
+        "models/gemini-2.0-flash",
+        "gemini-2.0-flash",
+        "models/gemini-1.5-flash",
+        "gemini-1.5-flash"
+    ]
+    
+    response = None
+    ultimo_erro = None
+    
+    for nome_modelo in modelos_para_testar:
+        try:
+            m = genai.GenerativeModel(model_name=nome_modelo, generation_config={"response_mime_type": "application/json"})
+            response = m.generate_content(prompt)
+            if response and response.text:
+                break
+        except Exception as e:
+            ultimo_erro = e
+            continue
+            
+    if not response:
+        raise ultimo_erro
+
     res_text = response.text.strip()
     if res_text.startswith("```json"):
         res_text = res_text[7:]
