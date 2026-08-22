@@ -40,12 +40,12 @@ def enviar_email_boas_vindas(destinatario_email, nome_usuario):
     return True, ""
 
 # Funções da API Mercado Pago para Pix Automático
-def criar_cobranca_pix(access_token, email_cliente, nome_cliente, valor=19.90):
+def criar_cobranca_pix(access_token, email_cliente, nome_cliente, valor=0.01):
     sdk = mercadopago.SDK(access_token)
     primeiro_nome = nome_cliente.split()[0] if nome_cliente else "Cliente"
     payment_data = {
         "transaction_amount": float(valor),
-        "description": "MFC Assinatura PRO - Mensal",
+        "description": "MFC Assinatura PRO - Teste",
         "payment_method_id": "pix",
         "payer": {
             "email": email_cliente if ("@" in email_cliente and "." in email_cliente) else "contato@mfc.com",
@@ -309,7 +309,7 @@ elif menu_selecionado == "📊 Dashboard & Métricas":
 # ==========================================
 elif menu_selecionado == "🔮 Planejamento Futuro":
     if not eh_pro:
-        st.markdown("<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'><div class='pro-tag'>Recurso Exclusivo PRO</div><h2 style='color: #d4af37; margin: 15px 0 10px 0;'>🔮 Planejamento Orçamentário</h2><p style='color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;'>Projete metas para os próximos meses e acompanhe sua capacidade de investimento.</p><div style='font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 15px;'>R$ 19,90 / mês</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'><div class='pro-tag'>Recurso Exclusivo PRO</div><h2 style='color: #d4af37; margin: 15px 0 10px 0;'>🔮 Planejamento Orçamentário</h2><p style='color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;'>Projete metas para os próximos meses e acompanhe sua capacidade de investimento.</p><div style='font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 15px;'>R$ 0,01 (Teste)</div></div>", unsafe_allow_html=True)
     else:
         st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>🔮 Planejamento Orçamentário Estratégico</h2></div>", unsafe_allow_html=True)
         col_p1, col_p2 = st.columns(2)
@@ -329,7 +329,7 @@ elif menu_selecionado == "🔮 Planejamento Futuro":
                 st.error("Atenção: Os custos fixos superam o teto.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (LIBERAÇÃO AUTOMÁTICA)
+# ⭐ ABA 4: ASSINATURA PRO (TESTE AUTOMÁTICO - R$ 0,01)
 # ==========================================
 elif menu_selecionado == "⭐ Assinatura PRO":
     st.markdown("<div style='text-align: center; margin-bottom: 30px;'><div class='brand-title' style='font-size: 2.2rem;'>MFC PRO</div><p style='color: #888; font-size: 0.95rem; margin-top: 4px;'>Eleve o seu controle patrimonial</p></div>", unsafe_allow_html=True)
@@ -339,21 +339,21 @@ elif menu_selecionado == "⭐ Assinatura PRO":
         st.markdown("<div class='glass-card' style='border-color: rgba(255,255,255,0.06);'><h3 style='color:#888 !important; margin-top:0;'>Básico</h3><h2 style='color:#fff !important; font-size:1.8rem;'>Grátis</h2><hr style='border-color: rgba(255,255,255,0.06);'><ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ 1 Upload por vez</li><li>✔ Resumo de entradas e saídas</li><li>✔ Gráficos de proporção</li><li>✖ Multi-upload simultâneo</li><li>✖ Aba de Planejamento Futuro</li></ul></div>", unsafe_allow_html=True)
         
     with col_c2:
-        st.markdown("<div class='glass-card' style='border: 2px solid #d4af37;'><div class='pro-tag'>Recomendado</div><h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3><h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 19,90 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ mês</span></h2><hr style='border-color: rgba(212,175,55,0.2);'><ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ Upload de múltiplos PDFs</li><li>✔ Módulo de Planejamento Futuro</li><li>✔ Sem limites de uso</li><li>✔ Processamento acelerado</li></ul></div>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-card' style='border: 2px solid #d4af37;'><div class='pro-tag'>Modo Teste</div><h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3><h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 0,01 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ teste</span></h2><hr style='border-color: rgba(212,175,55,0.2);'><ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ Upload de múltiplos PDFs</li><li>✔ Módulo de Planejamento Futuro</li><li>✔ Sem limites de uso</li><li>✔ Processamento acelerado</li></ul></div>", unsafe_allow_html=True)
         
     if not eh_pro:
         st.write("")
         st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
         st.subheader("💳 Ativação Instantânea com Liberação Automática")
-        st.write("Valor da assinatura mensal: **R$ 19,90** (Pix)")
+        st.write("Valor do teste de aprovação: **R$ 0,01** (Pix)")
         
         if not mp_access_token:
             st.info("💡 Configure seu `MP_ACCESS_TOKEN` do Mercado Pago nos Secrets para habilitar a aprovação 100% automática.")
         
-        if st.button("📱 Gerar QR Code Pix (R$ 19,90)", use_container_width=True):
+        if st.button("📱 Gerar QR Code Pix (R$ 0,01)", use_container_width=True):
             if mp_access_token:
-                with st.spinner("Gerando cobrança Pix oficial..."):
-                    pid, qrb64, copia_cola = criar_cobranca_pix(mp_access_token, user_email, usuario_atual, 19.90)
+                with st.spinner("Gerando cobrança Pix de teste (R$ 0,01)..."):
+                    pid, qrb64, copia_cola = criar_cobranca_pix(mp_access_token, user_email, usuario_atual, 0.01)
                     if qrb64:
                         st.session_state["pix_payment_id"] = pid
                         st.session_state["pix_qr_base64"] = qrb64
@@ -376,10 +376,10 @@ elif menu_selecionado == "⭐ Assinatura PRO":
                     st.session_state["pix_qr_base64"] = ""
                     st.session_state["pix_payment_id"] = None
                     st.balloons()
-                    st.success("🎉 Pagamento confirmado com sucesso! Seu Plano PRO foi liberado.")
+                    st.success("🎉 Pagamento de R$ 0,01 confirmado! Seu Plano PRO foi liberado automaticamente.")
                     st.rerun()
                 else:
-                    st.info("⏳ Aguardando pagamento... Assim que você pagar no app do seu banco, o acesso é liberado sozinho.")
+                    st.info("⏳ Aguardando pagamento do Pix de R$ 0,01... O sistema liberará o acesso automaticamente assim que o banco confirmar.")
                     if st.button("🔄 Atualizar Status Manualmente"):
                         st.rerun()
 
