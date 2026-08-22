@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo institucional XP com bloqueio estrito de digitação em selects
+# Estilo institucional XP com bloqueio de escrita em select e menus de tabela
 css_style = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -33,7 +33,6 @@ css_style = """
     .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; }
     .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; }
     
-    /* Bloqueio de escrita nos seletores */
     div[data-baseweb="select"] input {
         caret-color: transparent !important;
         cursor: pointer !important;
@@ -44,7 +43,6 @@ css_style = """
         cursor: pointer !important;
     }
     
-    /* Ocultar menus internos do cabeçalho da tabela */
     [data-testid="stDataFrameHeader"] button, 
     [data-testid="stDataFrameHeaderMenu"], 
     [data-testid="stDataFrame"] th button, 
@@ -126,6 +124,8 @@ if "usuario_logado" not in st.session_state:
     st.session_state["usuario_logado"] = ""
 if "transacoes" not in st.session_state:
     st.session_state["transacoes"] = []
+if "chat_mensagens" not in st.session_state:
+    st.session_state["chat_mensagens"] = []
 if "pix_payment_id" not in st.session_state:
     st.session_state["pix_payment_id"] = None
 if "pix_qr_base64" not in st.session_state:
@@ -206,10 +206,11 @@ with st.sidebar:
     badge_html = '<span class="pro-tag">⭐ PLANO PRO</span>' if eh_pro else '<span style="background:#1a1c24; color:#777; font-size:0.72rem; padding:3px 8px; border-radius:4px;">PLANO BÁSICO</span>'
     st.markdown("<div style='background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;'><div style='font-size: 0.72rem; color: #777; text-transform: uppercase;'>Usuário</div><div style='font-weight: 700; font-size: 1.05rem; color: #ffffff;'>" + str(usuario_atual) + "</div><div style='font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;'>" + str(user_email) + "</div>" + badge_html + "</div>", unsafe_allow_html=True)
     
-    rotas_chaves = ["upload", "dashboard", "planejamento", "assinatura"]
+    rotas_chaves = ["upload", "dashboard", "chat_ia", "planejamento", "assinatura"]
     mapa_titulos = {
         "upload": "📥 Upload de Extratos",
         "dashboard": "📊 Dashboard & Métricas",
+        "chat_ia": "💬 Consultor IA (PRO)",
         "planejamento": "🔮 Planejamento Futuro",
         "assinatura": "⭐ Assinatura PRO"
     }
@@ -228,6 +229,7 @@ with st.sidebar:
     if st.session_state["transacoes"]:
         if st.button("🗑️ Limpar Dados Atuais", use_container_width=True):
             st.session_state["transacoes"] = []
+            st.session_state["chat_mensagens"] = []
             st.rerun()
 
     if st.button("🚪 Sair", use_container_width=True):
@@ -235,7 +237,7 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# Motor IA
+# Motor IA para Extração
 def processar_extrato_pdf(file, chave_api):
     reader = PdfReader(file)
     texto_extrato = ""
@@ -281,6 +283,38 @@ def processar_extrato_pdf(file, chave_api):
     if res_text.endswith("```"):
         res_text = res_text[:-3]
     return json.loads(res_text.strip())
+
+# Motor IA para Chat Consultor Financeiro
+def responder_chat_consultor(chave_api, transacoes_lista, historico_chat, pergunta_usuario):
+    genai.configure(api_key=chave_api)
+    
+    contexto_financeiro = json.dumps(transacoes_lista, ensure_ascii=False)
+    system_instruction = (
+        "Você é o Consultor Financeiro Oficial do MFC (My Financial Control). "
+        "Seu tom é executivo, direto, analítico e de alto nível (estilo private banker / wealth management). "
+        "Você tem acesso total aos lançamentos bancários conciliados do cliente neste JSON: " + contexto_financeiro + ". "
+        "Analise esses dados para responder às perguntas do usuário com números exatos, insights de corte de custos, "
+        "identificação de gastos invisíveis/supérfluos e recomendações estratégicas de investimento e poupança. "
+        "Seja cordial, use formatação em tópicos e valores em R$."
+    )
+    
+    modelos = ["models/gemini-3.6-flash", "gemini-3.6-flash", "models/gemini-2.0-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    
+    # Montar histórico em texto
+    prompt_conversa = system_instruction + "\n\nHISTÓRICO DA CONVERSA:\n"
+    for msg in historico_chat:
+        prompt_conversa += f"{msg['role'].upper()}: {msg['content']}\n"
+    prompt_conversa += f"USER: {pergunta_usuario}\nASSISTANT:"
+    
+    for mod in modelos:
+        try:
+            m = genai.GenerativeModel(model_name=mod)
+            res = m.generate_content(prompt_conversa)
+            if res and res.text:
+                return res.text.strip()
+        except Exception:
+            continue
+    return "Desculpe, não foi possível analisar sua solicitação no momento. Verifique sua chave de integração."
 
 # ==========================================
 # 📥 ABA 1: UPLOAD DE EXTRATOS
@@ -349,7 +383,6 @@ elif menu_selecionado == "dashboard":
         with c_tab:
             st.markdown("### 📋 Lançamentos Conciliados")
             
-            # Filtros nativos com inputs protegidos
             f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
             with f1:
                 busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
@@ -426,7 +459,61 @@ elif menu_selecionado == "dashboard":
             st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# 🔮 ABA 3: PLANEJAMENTO FUTURO
+# 💬 ABA NOVIDADE: CONSULTOR IA (PRO)
+# ==========================================
+elif menu_selecionado == "chat_ia":
+    if not eh_pro:
+        st.markdown(
+            "<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'>"
+            "<div class='pro-tag'>Recurso Exclusivo PRO</div>"
+            "<h2 style='color: #d4af37; margin: 15px 0 10px 0;'>💬 Consultor Financeiro com IA</h2>"
+            "<p style='color: #bbb; max-width: 580px; margin: 0 auto 20px auto; font-size: 0.95rem;'>"
+            "Converse em tempo real com seu consultor de patrimônio IA. Ele audita seus extratos, "
+            "identifica assinaturas esquecidas, aponta onde você mais gastou e monta seu plano de corte de custos."
+            "</p>"
+            "<div style='font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 20px;'>R$ 19,90 / mês</div>"
+            "</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            "<div class='glass-card'>"
+            "<h2 style='margin:0; color:#d4af37;'>💬 Consultor Financeiro IA</h2>"
+            "<p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>"
+            "Tire dúvidas estratégicas sobre seus extratos, receba diagnósticos de gastos e planos de economia."
+            "</p></div>",
+            unsafe_allow_html=True
+        )
+        
+        if not st.session_state["transacoes"]:
+            st.info("💡 Dica: Importe seus extratos na aba 'Upload de Extratos' para que o consultor possa auditar suas contas com precisão.")
+            
+        # Renderizar mensagens anteriores
+        for msg in st.session_state["chat_mensagens"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                
+        # Input do chat
+        if prompt_user := st.chat_input("Ex: Quanto gastei com delivery? Como cortar R$ 400 esse mês?"):
+            # Adiciona mensagem do usuário
+            st.session_state["chat_mensagens"].append({"role": "user", "content": prompt_user})
+            with st.chat_message("user"):
+                st.markdown(prompt_user)
+                
+            # Gera resposta da IA
+            with st.chat_message("assistant"):
+                with st.spinner("Consultor IA analisando suas finanças..."):
+                    resposta_ia = responder_chat_consultor(
+                        api_key, 
+                        st.session_state["transacoes"], 
+                        st.session_state["chat_mensagens"][:-1], 
+                        prompt_user
+                    )
+                    st.markdown(resposta_ia)
+                    st.session_state["chat_mensagens"].append({"role": "assistant", "content": resposta_ia})
+
+# ==========================================
+# 🔮 ABA 4: PLANEJAMENTO FUTURO
 # ==========================================
 elif menu_selecionado == "planejamento":
     if not eh_pro:
@@ -450,99 +537,7 @@ elif menu_selecionado == "planejamento":
                 st.error("Atenção: Os custos fixos superam o teto.")
 
 # ==========================================
-# ⭐ ABA 4: ASSINATURA PRO (PRODUÇÃO - R$ 19,90)
+# ⭐ ABA 5: ASSINATURA PRO (PRODUÇÃO - R$ 19,90)
 # ==========================================
 elif menu_selecionado == "assinatura":
-    st.markdown("<div style='text-align: center; margin-bottom: 30px;'><div class='brand-title' style='font-size: 2.2rem;'>MFC PRO</div><p style='color: #888; font-size: 0.95rem; margin-top: 4px;'>Eleve o seu controle patrimonial</p></div>", unsafe_allow_html=True)
-    
-    col_c1, col_c2 = st.columns(2)
-    with col_c1:
-        st.markdown("<div class='glass-card' style='border-color: rgba(255,255,255,0.06);'><h3 style='color:#888 !important; margin-top:0;'>Básico</h3><h2 style='color:#fff !important; font-size:1.8rem;'>Grátis</h2><hr style='border-color: rgba(255,255,255,0.06);'><ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ 1 Upload por vez</li><li>✔ Resumo de entradas e saídas</li><li>✔ Gráficos de proporção</li><li>✖ Multi-upload simultâneo</li><li>✖ Aba de Planejamento Futuro</li></ul></div>", unsafe_allow_html=True)
-        
-    with col_c2:
-        st.markdown("<div class='glass-card' style='border: 2px solid #d4af37;'><div class='pro-tag'>Recomendado</div><h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3><h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 19,90 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ mês</span></h2><hr style='border-color: rgba(212,175,55,0.2);'><ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'><li>✔ Upload de múltiplos PDFs</li><li>✔ Módulo de Planejamento Futuro</li><li>✔ Sem limites de uso</li><li>✔ Processamento acelerado</li></ul></div>", unsafe_allow_html=True)
-        
-    if not eh_pro:
-        st.write("")
-        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-        st.subheader("💳 Ativação Instantânea com Liberação Automática")
-        st.write("Valor da assinatura mensal: **R$ 19,90** (Pix)")
-        
-        if not mp_access_token:
-            st.info("💡 Configure seu `MP_ACCESS_TOKEN` do Mercado Pago nos Secrets para habilitar a aprovação 100% automática.")
-        
-        if st.button("📱 Gerar QR Code Pix (R$ 19,90)", use_container_width=True):
-            if mp_access_token:
-                with st.spinner("Gerando cobrança Pix (R$ 19,90)..."):
-                    pid, qrb64, copia_cola = criar_cobranca_pix(mp_access_token, user_email, usuario_atual, 19.90)
-                    if qrb64:
-                        st.session_state["pix_payment_id"] = pid
-                        st.session_state["pix_qr_base64"] = qrb64
-                        st.session_state["pix_copia_cola"] = copia_cola
-                    else:
-                        st.error("Erro ao comunicar com Mercado Pago. Verifique o token nos Secrets.")
-            else:
-                st.warning("Adicione MP_ACCESS_TOKEN nos Secrets para gerar cobranças dinâmicas.")
-            
-        if st.session_state["pix_qr_base64"]:
-            c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
-            with c_qr2:
-                st.markdown("<div style='background:#ffffff; padding:20px; border-radius:14px; text-align:center; margin:20px 0; max-width:280px; margin-left:auto; margin-right:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);'><img src='data:image/png;base64," + str(st.session_state['pix_qr_base64']) + "' width='220' style='display:block; margin:0 auto;' alt='QR Code Pix' /></div>", unsafe_allow_html=True)
-                
-            if st.session_state["pix_payment_id"] and mp_access_token:
-                status = checar_status_pagamento(mp_access_token, st.session_state["pix_payment_id"])
-                if status == "approved":
-                    st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
-                    st.session_state["pix_qr_base64"] = ""
-                    st.session_state["pix_payment_id"] = None
-                    st.balloons()
-                    st.success("🎉 Pagamento de R$ 19,90 confirmado! Seu Plano PRO foi liberado automaticamente.")
-                    st.rerun()
-                else:
-                    st.info("⏳ Aguardando pagamento do Pix de R$ 19,90... O sistema liberará o acesso automaticamente assim que o banco confirmar.")
-                    if st.button("🔄 Atualizar Status Manualmente"):
-                        st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='glass-card' style='border-color: #00e676; text-align: center; margin-top: 20px;'><h3 style='color: #00e676 !important; margin: 0;'>✔ Assinatura PRO Ativa</h3><p style='color: #aaa; margin: 5px 0 0 0;'>Você possui acesso a todos os recursos ilimitados do MFC.</p></div>", unsafe_allow_html=True)
-
-# ==========================================
-# 👥 ABA 5: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA ADMIN)
-# ==========================================
-elif menu_selecionado == "usuarios" and eh_admin:
-    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão exclusiva do administrador (admin).</p></div>", unsafe_allow_html=True)
-    
-    lista_usuarios = []
-    for nome_u, info_u in st.session_state["usuarios_db"].items():
-        lista_usuarios.append({
-            "Nome de Usuário": nome_u,
-            "E-mail": info_u.get("email", "-"),
-            "Senha": info_u.get("senha", "-"),
-            "Plano Atual": info_u.get("plano", "Gratuito")
-        })
-        
-    df_users = pd.DataFrame(lista_usuarios)
-    st.dataframe(df_users, use_container_width=True, hide_index=True)
-    st.write("")
-    st.markdown("### ⚡ Ações Rápidas de Planos")
-    
-    for u, dados in list(st.session_state["usuarios_db"].items()):
-        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
-        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
-        col_m1.markdown("<b>" + str(u) + "</b> — <span style='color:" + str(status_color) + "; font-weight:bold;'>" + str(dados['plano']) + "</span>", unsafe_allow_html=True)
-        col_m1.caption("E-mail: " + str(dados.get('email', '-')))
-        
-        if dados["plano"] != "Pro":
-            if col_m2.button("⭐ Ativar PRO", key="btn_pro_" + str(u)):
-                st.session_state["usuarios_db"][u]["plano"] = "Pro"
-                st.success(str(u) + " agora é PRO!")
-                st.rerun()
-        else:
-            if u not in ["admin"]:
-                if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
-                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                    st.info(str(u) + " voltou ao Básico.")
-                    st.rerun()
-                    
-        st.markdown("---")
+    st.markdown("<div style='text-align: center; margin-bottom: 30px;'><div class='brand-title' style='font-size: 2.2rem;'>MFC PRO</div><p style='color: #888
