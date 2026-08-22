@@ -179,7 +179,7 @@ def checar_status_pagamento(access_token, payment_id):
     payment = payment_response.get("response", {})
     return payment.get("status", "pending")
 
-# Banco de dados e sessão
+# Banco de dados e sessão persistente
 if "usuarios_db" not in st.session_state:
     st.session_state["usuarios_db"] = {
         "admin": {
@@ -212,6 +212,16 @@ if "pix_qr_base64" not in st.session_state:
     st.session_state["pix_qr_base64"] = ""
 if "pix_copia_cola" not in st.session_state:
     st.session_state["pix_copia_cola"] = ""
+
+# Estado persistente dos filtros do Dashboard
+if "filtro_periodo" not in st.session_state:
+    st.session_state["filtro_periodo"] = None
+if "filtro_busca" not in st.session_state:
+    st.session_state["filtro_busca"] = ""
+if "filtro_tipo" not in st.session_state:
+    st.session_state["filtro_tipo"] = "Todos"
+if "filtro_ordem" not in st.session_state:
+    st.session_state["filtro_ordem"] = "Mais Recentes"
 
 # Função de checagem e expiração automática de 30 dias
 def verificar_expiracao_assinaturas():
@@ -336,6 +346,8 @@ with st.sidebar:
         if st.button("🗑️ Limpar Dados Atuais", use_container_width=True):
             st.session_state["transacoes"] = []
             st.session_state["chat_mensagens"] = []
+            st.session_state["filtro_periodo"] = None
+            st.session_state["filtro_busca"] = ""
             st.rerun()
 
     if st.button("🚪 Sair", use_container_width=True):
@@ -455,6 +467,7 @@ if menu_selecionado == "upload":
                 
                 if todas_transacoes:
                     st.session_state["transacoes"].extend(todas_transacoes)
+                    st.session_state["filtro_periodo"] = None
                     st.success("✨ Sucesso! Movimentações consolidadas.")
 
 # ==========================================
@@ -470,15 +483,26 @@ elif menu_selecionado == "dashboard":
         df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
         df_raw = df_raw.sort_values(by="data_dt", ascending=False)
         
-        # Filtros de busca e período no topo para sincronização
+        # Filtros de busca e período no topo com chaves de sessão persistentes
         st.markdown("### 📋 Lançamentos Conciliados")
         f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
+        
         with f1:
-            busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
+            busca = st.text_input("🔍 Buscar lançamento", value=st.session_state["filtro_busca"], key="dash_input_busca", placeholder="Nome ou comércio...")
+            st.session_state["filtro_busca"] = busca
+            
         with f2:
-            filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
+            opcoes_tipo = ["Todos", "Receitas", "Despesas"]
+            idx_tipo = opcoes_tipo.index(st.session_state["filtro_tipo"]) if st.session_state["filtro_tipo"] in opcoes_tipo else 0
+            filtro_tipo = st.selectbox("Tipo", opcoes_tipo, index=idx_tipo, key="dash_select_tipo")
+            st.session_state["filtro_tipo"] = filtro_tipo
+            
         with f3:
-            ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
+            opcoes_ordem = ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"]
+            idx_ordem = opcoes_ordem.index(st.session_state["filtro_ordem"]) if st.session_state["filtro_ordem"] in opcoes_ordem else 0
+            ordem = st.selectbox("Ordenar por", opcoes_ordem, index=idx_ordem, key="dash_select_ordem")
+            st.session_state["filtro_ordem"] = ordem
+            
         with f4:
             min_dt = df_raw["data_dt"].min()
             max_dt = df_raw["data_dt"].max()
@@ -487,7 +511,9 @@ elif menu_selecionado == "dashboard":
             else:
                 min_val, max_val = min_dt.date(), max_dt.date()
                 
-            intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
+            val_periodo_inicial = st.session_state["filtro_periodo"] if st.session_state["filtro_periodo"] else (min_val, max_val)
+            intervalo_data = st.date_input("Período", value=val_periodo_inicial, format="DD/MM/YYYY", key="dash_date_periodo")
+            st.session_state["filtro_periodo"] = intervalo_data
 
         # Dataset filtrado pelo período para padronizar KPIs, Pizza e Tabela
         df_periodo = df_raw.copy()
@@ -677,15 +703,19 @@ elif menu_selecionado == "chat_ia":
         if not st.session_state["transacoes"]:
             st.info("💡 Dica: Importe seus extratos na aba 'Upload de Extratos' para que o consultor possa auditar suas contas com precisão.")
             
+        # Renderizar mensagens anteriores da sessão
         for msg in st.session_state["chat_mensagens"]:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 
+        # Captura input do usuário
         if prompt_user := st.chat_input("Ex: Quanto gastei com delivery? Como cortar R$ 400 esse mês?"):
+            # Salva imediatamente a pergunta do usuário no session_state
             st.session_state["chat_mensagens"].append({"role": "user", "content": prompt_user})
             with st.chat_message("user"):
                 st.markdown(prompt_user)
                 
+            # Processa e persiste a resposta imediatamente
             with st.chat_message("assistant"):
                 with st.spinner("Consultor IA analisando suas finanças..."):
                     resposta_ia = responder_chat_consultor(
