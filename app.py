@@ -19,7 +19,7 @@ st.set_page_config(
 # Estilo institucional XP / Private Banking Premium com Redesign Moderno do Menu Lateral
 css_style = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    @import url('[https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap)');
     
     html, body, [class*='css'], .stApp {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -657,7 +657,7 @@ elif menu_selecionado == "dashboard":
             st.markdown("##### 📊 Proporção de Fluxo")
             total_vol = total_entradas + total_saidas
             
-            # Gráfico de Rosca Ultra Moderno (Cores Refinadas + Layout Sem Fundo Duro + Tipografia Premium)
+            # Gráfico de Rosca Ultra Moderno (Compatível com todas as versões do Plotly)
             fig_pie = go.Figure(data=[go.Pie(
                 labels=["Receitas", "Despesas"],
                 values=[total_entradas, total_saidas],
@@ -669,7 +669,7 @@ elif menu_selecionado == "dashboard":
                 textinfo="percent",
                 textposition="inside",
                 insidetextorientation="horizontal",
-                textfont=dict(size=14, color="#ffffff", family="Plus Jakarta Sans", weight="bold"),
+                textfont=dict(size=14, color="#ffffff", family="Plus Jakarta Sans"),
                 sort=False,
                 direction="clockwise"
             )])
