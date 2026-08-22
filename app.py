@@ -5,6 +5,7 @@ import google.generativeai as genai
 import json
 import smtplib
 import mercadopago
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pypdf import PdfReader
@@ -15,8 +16,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo institucional XP com ocultação do menu em inglês da tabela
-css_style = "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'); html, body, [class*='css'], .stApp { font-family: 'Inter', sans-serif !important; background-color: #08090b !important; color: #e5e5e5 !important; } section[data-testid='stSidebar'] { background-color: #0d0f14 !important; border-right: 1px solid rgba(212, 175, 55, 0.12) !important; } .brand-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 2px; color: #d4af37; margin: 0; line-height: 1; text-align: center; } .brand-subtitle { font-size: 0.78rem; letter-spacing: 4px; text-transform: uppercase; color: #9e9575; margin-top: 4px; font-weight: 600; text-align: center; margin-bottom: 20px; } .glass-card { background: rgba(18, 20, 26, 0.7); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 14px; padding: 24px; margin-bottom: 20px; } .kpi-box { background: #0f1117; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 20px; text-align: center; } .kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a89f81; margin-bottom: 6px; } .kpi-val { font-size: 1.7rem; font-weight: 800; margin: 0; } div.stButton > button { background: #d4af37 !important; color: #08090b !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; padding: 10px 20px !important; font-weight: 700 !important; } div.stButton > button:hover { background: #e6c35c !important; border-color: #e6c35c !important; color: #000000 !important; } .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } [data-testid='stDataFrameHeader'] button, [data-testid='stDataFrameHeaderMenu'] { display: none !important; }</style>"
+# Estilo institucional XP com bloqueio de escrita em select e remoção total do menu dos cabeçalhos
+css_style = "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'); html, body, [class*='css'], .stApp { font-family: 'Inter', sans-serif !important; background-color: #08090b !important; color: #e5e5e5 !important; } section[data-testid='stSidebar'] { background-color: #0d0f14 !important; border-right: 1px solid rgba(212, 175, 55, 0.12) !important; } .brand-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 2px; color: #d4af37; margin: 0; line-height: 1; text-align: center; } .brand-subtitle { font-size: 0.78rem; letter-spacing: 4px; text-transform: uppercase; color: #9e9575; margin-top: 4px; font-weight: 600; text-align: center; margin-bottom: 20px; } .glass-card { background: rgba(18, 20, 26, 0.7); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 14px; padding: 24px; margin-bottom: 20px; } .kpi-box { background: #0f1117; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 20px; text-align: center; } .kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a89f81; margin-bottom: 6px; } .kpi-val { font-size: 1.7rem; font-weight: 800; margin: 0; } div.stButton > button { background: #d4af37 !important; color: #08090b !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; padding: 10px 20px !important; font-weight: 700 !important; } div.stButton > button:hover { background: #e6c35c !important; border-color: #e6c35c !important; color: #000000 !important; } .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } div[data-baseweb='select'] input { caret-color: transparent !important; pointer-events: none !important; } [data-testid='stDataFrameHeader'] button, [data-testid='stDataFrameHeaderMenu'], [data-testid='stDataFrame'] th button, [data-testid='stDataFrame'] [role='columnheader'] button { display: none !important; opacity: 0 !important; visibility: hidden !important; }</style>"
 st.markdown(css_style, unsafe_allow_html=True)
 
 # Disparo de e-mail institucional
@@ -149,7 +150,7 @@ plano_atual = dados_usuario.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
 user_email = dados_usuario.get("email", "")
 
-# LIBERAÇÃO EXCLUSIVA APENAS PARA O USUÁRIO 'admin'
+# LIBERAÇÃO EXCLUSIVA APENAS PARA O ADMIN
 eh_admin = (usuario_atual == "admin")
 
 api_key = st.secrets.get("GEMINI_API_KEY", "")
@@ -191,7 +192,7 @@ with st.sidebar:
         st.session_state["usuario_logado"] = ""
         st.rerun()
 
-# Motor IA com fallback automático de versões de modelo
+# Motor IA
 def processar_extrato_pdf(file, chave_api):
     reader = PdfReader(file)
     texto_extrato = ""
@@ -300,27 +301,42 @@ elif menu_selecionado == "dashboard":
         
         st.write("")
         st.write("")
-        c_tab, c_graf = st.columns([1.3, 1.1])
+        c_tab, c_graf = st.columns([1.4, 1.0])
         
         with c_tab:
             st.markdown("### 📋 Lançamentos Conciliados")
             
             # Filtros nativos em português
-            f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
-            with f_col1:
+            f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
+            with f1:
                 busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
-            with f_col2:
+            with f2:
                 filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
-            with f_col3:
+            with f3:
                 ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
+            with f4:
+                # Intervalo de datas
+                min_dt = df_raw["data_dt"].min()
+                max_dt = df_raw["data_dt"].max()
+                if pd.isna(min_dt) or pd.isna(max_dt):
+                    min_val, max_val = datetime.today().date(), datetime.today().date()
+                else:
+                    min_val, max_val = min_dt.date(), max_dt.date()
+                    
+                intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
 
             df_filtrado = df_raw.copy()
+            
             if busca:
                 df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
             if filtro_tipo == "Receitas":
                 df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
             elif filtro_tipo == "Despesas":
                 df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
+
+            if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
+                d_ini, d_fim = intervalo_data
+                df_filtrado = df_filtrado[(df_filtrado["data_dt"].dt.date >= d_ini) & (df_filtrado["data_dt"].dt.date <= d_fim)]
 
             if ordem == "Mais Recentes":
                 df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
@@ -473,19 +489,3 @@ elif menu_selecionado == "usuarios" and eh_admin:
     for u, dados in list(st.session_state["usuarios_db"].items()):
         col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
         status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
-        col_m1.markdown("<b>" + str(u) + "</b> — <span style='color:" + str(status_color) + "; font-weight:bold;'>" + str(dados['plano']) + "</span>", unsafe_allow_html=True)
-        col_m1.caption("E-mail: " + str(dados.get('email', '-')))
-        
-        if dados["plano"] != "Pro":
-            if col_m2.button("⭐ Ativar PRO", key="btn_pro_" + str(u)):
-                st.session_state["usuarios_db"][u]["plano"] = "Pro"
-                st.success(str(u) + " agora é PRO!")
-                st.rerun()
-        else:
-            if u not in ["admin"]:
-                if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
-                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                    st.info(str(u) + " voltou ao Básico.")
-                    st.rerun()
-                    
-        st.markdown("---")
