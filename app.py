@@ -232,7 +232,7 @@ def criar_cobranca_pix(access_token, email_cliente, nome_cliente, valor=19.90):
         "payment_method_id": "pix",
         "payer": {
             "email": email_valido,
-            "first_name": primer_nome := primeiro_nome
+            "first_name": primeiro_nome
         }
     }
     payment_response = sdk.payment().create(payment_data)
