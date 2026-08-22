@@ -854,3 +854,38 @@ elif menu_selecionado == "usuarios" and eh_admin:
         
         lista_usuarios.append({
             "Usuário": nome_u,
+            "E-mail": info_u.get("email", "-"),
+            "Senha": info_u.get("senha", "-"),
+            "Plano Atual": plano,
+            "Data Aquisição": dt_aquisicao,
+            "Data Vencimento": dt_vencimento,
+            "Vigência": status_vigencia
+        })
+        
+    df_users = pd.DataFrame(lista_usuarios)
+    st.dataframe(df_users, use_container_width=True, hide_index=True)
+    st.write("")
+    st.markdown("### ⚡ Ações Rápidas de Planos")
+    
+    for u, dados in list(st.session_state["usuarios_db"].items()):
+        col_m1, col_m2, col_m3 = st.columns([2.5, 1.2, 1.2])
+        status_color = "#00e676" if dados['plano'] == 'Pro' else "#888888"
+        venc_texto = f" (Vence: {dados.get('data_vencimento')})" if dados.get('data_vencimento') and u != 'admin' else ""
+        
+        col_m1.markdown(f"<b>{u}</b> — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span><small style='color:#aaa;'>{venc_texto}</small>", unsafe_allow_html=True)
+        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
+        
+        if dados["plano"] != "Pro":
+            if col_m2.button("⭐ Ativar 30 Dias", key="btn_pro_" + str(u)):
+                ativar_plano_pro(u)
+                st.success(f"{u} agora é PRO por 30 dias!")
+                st.rerun()
+        else:
+            if u not in ["admin"]:
+                if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
+                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
+                    st.session_state["usuarios_db"][u]["data_vencimento"] = None
+                    st.info(f"{u} voltou ao Básico.")
+                    st.rerun()
+                    
+        st.markdown("---")
