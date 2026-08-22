@@ -428,4 +428,322 @@ elif menu_selecionado == "dashboard":
     if df_raw.empty:
         st.markdown("<div class='glass-card' style='text-align:center; padding: 40px;'><h3 style='color:#888;'>Nenhum Extrato Importado</h3><p style='color:#666;'>Faça o upload do seu primeiro PDF bancário na aba 'Upload de Extratos'.</p></div>", unsafe_allow_html=True)
     else:
-        df_raw["valor"] =
+        df_raw["valor"] = pd.to_numeric(df_raw["valor"], errors="coerce").fillna(0.0)
+        df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
+        df_raw = df_raw.sort_values(by="data_dt", ascending=False)
+        
+        df_rec = df_raw[df_raw["tipo"] == "Receita"]
+        df_des = df_raw[df_raw["tipo"] == "Despesa"]
+        
+        total_entradas = float(df_rec["valor"].sum())
+        total_saidas = float(df_des["valor"].sum())
+        saldo_liquido = total_entradas - total_saidas
+        if total_entradas > 0:
+            taxa_poupanca = (saldo_liquido / total_entradas) * 100.0
+        else:
+            taxa_poupanca = 0.0
+        cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown("<div class='kpi-box'><div class='kpi-label'>Receitas</div><div class='kpi-val' style='color: #00e676;'>+ R$ {:,.2f}</div></div>".format(total_entradas), unsafe_allow_html=True)
+        k2.markdown("<div class='kpi-box'><div class='kpi-label'>Despesas</div><div class='kpi-val' style='color: #ff5252;'>- R$ {:,.2f}</div></div>".format(total_saidas), unsafe_allow_html=True)
+        k3.markdown("<div class='kpi-box'><div class='kpi-label'>Saldo Líquido</div><div class='kpi-val' style='color: {};'>R$ {:,.2f}</div></div>".format(cor_saldo, saldo_liquido), unsafe_allow_html=True)
+        k4.markdown("<div class='kpi-box'><div class='kpi-label'>Taxa de Poupança</div><div class='kpi-val' style='color: #d4af37;'>{:.1f}%</div></div>".format(taxa_poupanca), unsafe_allow_html=True)
+        
+        st.write("")
+        st.write("")
+        c_tab, c_graf = st.columns([1.4, 1.0])
+        
+        with c_tab:
+            st.markdown("### 📋 Lançamentos Conciliados")
+            
+            f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
+            with f1:
+                busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
+            with f2:
+                filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
+            with f3:
+                ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
+            with f4:
+                min_dt = df_raw["data_dt"].min()
+                max_dt = df_raw["data_dt"].max()
+                if pd.isna(min_dt) or pd.isna(max_dt):
+                    min_val, max_val = datetime.today().date(), datetime.today().date()
+                else:
+                    min_val, max_val = min_dt.date(), max_dt.date()
+                    
+                intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
+
+            df_filtrado = df_raw.copy()
+            
+            if busca:
+                df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
+            if filtro_tipo == "Receitas":
+                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
+            elif filtro_tipo == "Despesas":
+                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
+
+            if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
+                d_ini, d_fim = intervalo_data
+                df_filtrado = df_filtrado[(df_filtrado["data_dt"].dt.date >= d_ini) & (df_filtrado["data_dt"].dt.date <= d_fim)]
+
+            if ordem == "Mais Recentes":
+                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
+            elif ordem == "Mais Antigos":
+                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=True)
+            elif ordem == "Maior Valor":
+                df_filtrado = df_filtrado.sort_values(by="valor", ascending=False)
+            elif ordem == "Menor Valor":
+                df_filtrado = df_filtrado.sort_values(by="valor", ascending=True)
+
+            df_render = df_filtrado[["data", "descricao", "tipo", "valor"]].copy()
+            st.dataframe(
+                df_render,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "data": "Data",
+                    "descricao": "Descrição",
+                    "tipo": "Tipo",
+                    "valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f")
+                },
+                height=380
+            )
+            
+        with c_graf:
+            st.markdown("### 📊 Proporção de Fluxo")
+            total_vol = total_entradas + total_saidas
+            fig = go.Figure(data=[go.Pie(
+                labels=["Receitas", "Despesas"],
+                values=[total_entradas, total_saidas],
+                hole=0.62,
+                marker=dict(colors=["#00e676", "#ff5252"], line=dict(color="#08090b", width=3)),
+                textinfo="percent",
+                textfont=dict(size=14, color="#ffffff", family="Inter")
+            )])
+            fig.update_layout(
+                paper_bgcolor="#0f1117",
+                plot_bgcolor="#0f1117",
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(color="#e5e5e5", size=12)),
+                annotations=[dict(text="<span style='font-size:11px; color:#888;'>TOTAL</span><br><b style='font-size:16px; color:#fff;'>R$ {:,.2f}</b>".format(total_vol), x=0.5, y=0.5, font_size=14, showarrow=False)],
+                margin=dict(t=10, b=30, l=10, r=10),
+                height=450
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+# ==========================================
+# 💬 ABA: CONSULTOR IA (PRO)
+# ==========================================
+elif menu_selecionado == "chat_ia":
+    if not eh_pro:
+        st.markdown(
+            "<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'>"
+            "<div class='pro-tag'>Recurso Exclusivo PRO</div>"
+            "<h2 style='color: #d4af37; margin: 15px 0 10px 0;'>💬 Consultor Financeiro com IA</h2>"
+            "<p style='color: #bbb; max-width: 580px; margin: 0 auto 20px auto; font-size: 0.95rem;'>"
+            "Converse em tempo real com seu consultor de patrimônio IA. Ele audita seus extratos, "
+            "identifica assinaturas esquecidas, aponta onde você mais gastou e monta seu plano de corte de custos."
+            "</p>"
+            "<div style='font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 20px;'>R$ 19,90 / mês</div>"
+            "</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            "<div class='glass-card'>"
+            "<h2 style='margin:0; color:#d4af37;'>💬 Consultor Financeiro IA</h2>"
+            "<p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>"
+            "Tire dúvidas estratégicas sobre seus extratos, receba diagnósticos de gastos e planos de economia."
+            "</p></div>",
+            unsafe_allow_html=True
+        )
+        
+        if not st.session_state["transacoes"]:
+            st.info("💡 Dica: Importe seus extratos na aba 'Upload de Extratos' para que o consultor possa auditar suas contas com precisão.")
+            
+        for msg in st.session_state["chat_mensagens"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                
+        if prompt_user := st.chat_input("Ex: Quanto gastei com delivery? Como cortar R$ 400 esse mês?"):
+            st.session_state["chat_mensagens"].append({"role": "user", "content": prompt_user})
+            with st.chat_message("user"):
+                st.markdown(prompt_user)
+                
+            with st.chat_message("assistant"):
+                with st.spinner("Consultor IA analisando suas finanças..."):
+                    resposta_ia = responder_chat_consultor(
+                        api_key, 
+                        st.session_state["transacoes"], 
+                        st.session_state["chat_mensagens"][:-1], 
+                        prompt_user
+                    )
+                    st.markdown(resposta_ia)
+                    st.session_state["chat_mensagens"].append({"role": "assistant", "content": resposta_ia})
+
+# ==========================================
+# 🔮 ABA 4: PLANEJAMENTO FUTURO
+# ==========================================
+elif menu_selecionado == "planejamento":
+    if not eh_pro:
+        st.markdown(
+            "<div class='glass-card' style='text-align: center; border: 1px solid #d4af37; padding: 40px 20px;'>"
+            "<div class='pro-tag'>Recurso Exclusivo PRO</div>"
+            "<h2 style='color: #d4af37; margin: 15px 0 10px 0;'>🔮 Planejamento Orçamentário</h2>"
+            "<p style='color: #bbb; max-width: 550px; margin: 0 auto 20px auto; font-size: 0.95rem;'>"
+            "Projete metas para os próximos meses e acompanhe sua capacidade de investimento."
+            "</p>"
+            "<div style='font-size: 1.4rem; color: #00e676; font-weight: 800; margin-bottom: 15px;'>R$ 19,90 / mês</div>"
+            "</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>🔮 Planejamento Orçamentário Estratégico</h2></div>", unsafe_allow_html=True)
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            st.markdown("#### 🎯 Metas de Gastos")
+            renda_est = st.number_input("Renda Prevista (R$)", value=5000.0, step=200.0)
+            teto_gasto = st.number_input("Teto Máximo Desejado (R$)", value=3200.0, step=100.0)
+            meta_sobra = renda_est - teto_gasto
+            st.markdown("<div class='kpi-box' style='margin-top: 15px; text-align: left; border-color: rgba(212,175,55,0.3);'><div class='kpi-label'>Economia Projetada</div><div class='kpi-val' style='color: #00e676;'>R$ {:,.2f}</div><small style='color: #666;'>Capacidade de poupança mensal</small></div>".format(meta_sobra), unsafe_allow_html=True)
+        with col_p2:
+            st.markdown("#### 💡 Despesas Fixas")
+            fixos = st.number_input("Custos Recorrentes", value=1800.0, step=100.0)
+            livre_lazer = teto_gasto - fixos
+            if livre_lazer > 0:
+                st.success("Saldo Livre: R$ {:,.2f}".format(livre_lazer))
+            else:
+                st.error("Atenção: Os custos fixos superam o teto.")
+
+# ==========================================
+# ⭐ ABA 5: ASSINATURA PRO (PRODUÇÃO - R$ 19,90)
+# ==========================================
+elif menu_selecionado == "assinatura":
+    st.markdown(
+        "<div style='text-align: center; margin-bottom: 30px;'>"
+        "<div class='brand-title' style='font-size: 2.2rem;'>MFC PRO</div>"
+        "<p style='color: #888; font-size: 0.95rem; margin-top: 4px;'>Eleve o seu controle patrimonial</p>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+    
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        st.markdown(
+            "<div class='glass-card' style='border-color: rgba(255,255,255,0.06);'>"
+            "<h3 style='color:#888 !important; margin-top:0;'>Básico</h3>"
+            "<h2 style='color:#fff !important; font-size:1.8rem;'>Grátis</h2>"
+            "<hr style='border-color: rgba(255,255,255,0.06);'>"
+            "<ul style='color:#888; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'>"
+            "<li>✔ 1 Upload por vez</li>"
+            "<li>✔ Resumo de entradas e saídas</li>"
+            "<li>✔ Gráficos de proporção</li>"
+            "<li>✖ Consultor Financeiro com IA (Chat)</li>"
+            "<li>✖ Multi-upload simultâneo</li>"
+            "<li>✖ Aba de Planejamento Futuro</li>"
+            "</ul></div>",
+            unsafe_allow_html=True
+        )
+        
+    with col_c2:
+        st.markdown(
+            "<div class='glass-card' style='border: 2px solid #d4af37;'>"
+            "<div class='pro-tag'>Recomendado</div>"
+            "<h3 style='color:#d4af37 !important; margin: 10px 0 0 0;'>Plano PRO</h3>"
+            "<h2 style='color:#00e676 !important; font-size:1.9rem; margin: 4px 0 0 0;'>R$ 19,90 <span style='font-size:0.9rem; color:#aaa; font-weight:400;'>/ mês</span></h2>"
+            "<hr style='border-color: rgba(212,175,55,0.2);'>"
+            "<ul style='color:#e5e5e5; line-height:2; font-size:0.9rem; list-style:none; padding-left:0;'>"
+            "<li>✔ <b>Consultor Financeiro IA (Chat Interativo)</b></li>"
+            "<li>✔ Upload de múltiplos PDFs</li>"
+            "<li>✔ Módulo de Planejamento Futuro</li>"
+            "<li>✔ Sem limites de uso</li>"
+            "<li>✔ Processamento acelerado</li>"
+            "</ul></div>",
+            unsafe_allow_html=True
+        )
+        
+    if not eh_pro:
+        st.write("")
+        st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+        st.subheader("💳 Ativação Instantânea com Liberação Automática")
+        st.write("Valor da assinatura mensal: **R$ 19,90** (Pix)")
+        
+        if not mp_access_token:
+            st.info("💡 Configure seu `MP_ACCESS_TOKEN` do Mercado Pago nos Secrets para habilitar a aprovação 100% automática.")
+        
+        if st.button("📱 Gerar QR Code Pix (R$ 19,90)", use_container_width=True):
+            if mp_access_token:
+                with st.spinner("Gerando cobrança Pix (R$ 19,90)..."):
+                    pid, qrb64, copia_cola = criar_cobranca_pix(mp_access_token, user_email, usuario_atual, 19.90)
+                    if qrb64:
+                        st.session_state["pix_payment_id"] = pid
+                        st.session_state["pix_qr_base64"] = qrb64
+                        st.session_state["pix_copia_cola"] = copia_cola
+                    else:
+                        st.error("Erro ao comunicar com Mercado Pago. Verifique o token nos Secrets.")
+            else:
+                st.warning("Adicione MP_ACCESS_TOKEN nos Secrets para gerar cobranças dinâmicas.")
+            
+        if st.session_state["pix_qr_base64"]:
+            c_qr1, c_qr2, c_qr3 = st.columns([1, 1.2, 1])
+            with c_qr2:
+                st.markdown("<div style='background:#ffffff; padding:20px; border-radius:14px; text-align:center; margin:20px 0; max-width:280px; margin-left:auto; margin-right:auto; box-shadow:0 8px 24px rgba(0,0,0,0.5);'><img src='data:image/png;base64," + str(st.session_state['pix_qr_base64']) + "' width='220' style='display:block; margin:0 auto;' alt='QR Code Pix' /></div>", unsafe_allow_html=True)
+                
+            if st.session_state["pix_payment_id"] and mp_access_token:
+                status = checar_status_pagamento(mp_access_token, st.session_state["pix_payment_id"])
+                if status == "approved":
+                    st.session_state["usuarios_db"][usuario_atual]["plano"] = "Pro"
+                    st.session_state["pix_qr_base64"] = ""
+                    st.session_state["pix_payment_id"] = None
+                    st.balloons()
+                    st.success("🎉 Pagamento de R$ 19,90 confirmado! Seu Plano PRO foi liberado automaticamente.")
+                    st.rerun()
+                else:
+                    st.info("⏳ Aguardando pagamento do Pix de R$ 19,90... O sistema liberará o acesso automaticamente assim que o banco confirmar.")
+                    if st.button("🔄 Atualizar Status Manualmente"):
+                        st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='glass-card' style='border-color: #00e676; text-align: center; margin-top: 20px;'><h3 style='color: #00e676 !important; margin: 0;'>✔ Assinatura PRO Ativa</h3><p style='color: #aaa; margin: 5px 0 0 0;'>Você possui acesso a todos os recursos ilimitados do MFC.</p></div>", unsafe_allow_html=True)
+
+# ==========================================
+# 👥 ABA 6: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA ADMIN)
+# ==========================================
+elif menu_selecionado == "usuarios" and eh_admin:
+    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão exclusiva do administrador (admin).</p></div>", unsafe_allow_html=True)
+    
+    lista_usuarios = []
+    for nome_u, info_u in st.session_state["usuarios_db"].items():
+        lista_usuarios.append({
+            "Nome de Usuário": nome_u,
+            "E-mail": info_u.get("email", "-"),
+            "Senha": info_u.get("senha", "-"),
+            "Plano Atual": info_u.get("plano", "Gratuito")
+        })
+        
+    df_users = pd.DataFrame(lista_usuarios)
+    st.dataframe(df_users, use_container_width=True, hide_index=True)
+    st.write("")
+    st.markdown("### ⚡ Ações Rápidas de Planos")
+    
+    for u, dados in list(st.session_state["usuarios_db"].items()):
+        col_m1, col_m2, col_m3 = st.columns([2, 1.5, 1.5])
+        status_color = "#00e676" if dados['plano'] == 'Pro' else ("#ffc107" if dados['plano'] == 'Pendente' else "#888888")
+        col_m1.markdown("<b>" + str(u) + "</b> — <span style='color:" + str(status_color) + "; font-weight:bold;'>" + str(dados['plano']) + "</span>", unsafe_allow_html=True)
+        col_m1.caption("E-mail: " + str(dados.get('email', '-')))
+        
+        if dados["plano"] != "Pro":
+            if col_m2.button("⭐ Ativar PRO", key="btn_pro_" + str(u)):
+                st.session_state["usuarios_db"][u]["plano"] = "Pro"
+                st.success(str(u) + " agora é PRO!")
+                st.rerun()
+        else:
+            if u not in ["admin"]:
+                if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
+                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
+                    st.info(str(u) + " voltou ao Básico.")
+                    st.rerun()
+                    
+        st.markdown("---")
