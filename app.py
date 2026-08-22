@@ -126,7 +126,17 @@ css_style = """
         visibility: hidden !important;
         pointer-events: none !important;
     }
+    #MainMenu, footer, header {
+        visibility: hidden !important;
+    }
 </style>
+<script>
+    window.parent.document.addEventListener('keydown', function(e) {
+        if ((e.key === 'c' || e.key === 'C') && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+            e.stopPropagation();
+        }
+    }, true);
+</script>
 """
 st.markdown(css_style, unsafe_allow_html=True)
 
@@ -406,7 +416,7 @@ def processar_extrato_pdf(file, chave_api):
         res_text = res_text[:-3]
     return json.loads(res_text.strip())
 
-# Motor IA para Chat Consultor Financeiro
+# Motor IA para Chat Consultor Financeiro com formatação estritamente limpa
 def responder_chat_consultor(chave_api, transacoes_lista, historico_chat, pergunta_usuario):
     genai.configure(api_key=chave_api)
     
@@ -417,7 +427,9 @@ def responder_chat_consultor(chave_api, transacoes_lista, historico_chat, pergun
         "Você tem acesso total aos lançamentos bancários conciliados do cliente neste JSON: " + contexto_financeiro + ". "
         "Analise esses dados para responder às perguntas do usuário com números exatos, insights de corte de custos, "
         "identificação de gastos invisíveis/supérfluos e recomendações estratégicas de investimento e poupança. "
-        "Seja cordial, use formatação em tópicos e valores em R$."
+        "REGRA ESTRITA DE FORMATAÇÃO: NÃO utilize notação matemática LaTeX (como $ ou $$), nem blocos de código, "
+        "nem tags de cores. Escreva valores financeiros em formato de texto comum (exemplo: R$ 1.500,00 ou R$ 45,00). "
+        "Use formatação limpa em tópicos com marcadores e negrito comum (**texto**)."
     )
     
     modelos = ["models/gemini-3.6-flash", "gemini-3.6-flash", "models/gemini-2.0-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
@@ -432,7 +444,9 @@ def responder_chat_consultor(chave_api, transacoes_lista, historico_chat, pergun
             m = genai.GenerativeModel(model_name=mod)
             res = m.generate_content(prompt_conversa)
             if res and res.text:
-                return res.text.strip()
+                texto_limpo = res.text.strip()
+                texto_limpo = texto_limpo.replace("$", "")
+                return texto_limpo
         except Exception:
             continue
     return "Desculpe, não foi possível analisar sua solicitação no momento. Verifique sua chave de integração."
@@ -710,12 +724,10 @@ elif menu_selecionado == "chat_ia":
                 
         # Captura input do usuário
         if prompt_user := st.chat_input("Ex: Quanto gastei com delivery? Como cortar R$ 400 esse mês?"):
-            # Salva imediatamente a pergunta do usuário no session_state
             st.session_state["chat_mensagens"].append({"role": "user", "content": prompt_user})
             with st.chat_message("user"):
                 st.markdown(prompt_user)
                 
-            # Processa e persiste a resposta imediatamente
             with st.chat_message("assistant"):
                 with st.spinner("Consultor IA analisando suas finanças..."):
                     resposta_ia = responder_chat_consultor(
