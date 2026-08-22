@@ -147,7 +147,10 @@ dados_usuario = st.session_state["usuarios_db"].get(usuario_atual, {"plano": "Gr
 plano_atual = dados_usuario.get("plano", "Gratuito")
 eh_pro = (plano_atual == "Pro")
 user_email = dados_usuario.get("email", "")
-eh_master = (usuario_atual in ["Marcos", "admin"])
+
+# LIBERAÇÃO EXCLUSIVA APENAS PARA O USUÁRIO 'admin'
+eh_admin = (usuario_atual == "admin")
+
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 mp_access_token = st.secrets.get("MP_ACCESS_TOKEN", "")
 
@@ -159,7 +162,7 @@ with st.sidebar:
     st.markdown(f"<div style='background: #11131a; padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); margin-bottom: 20px;'><div style='font-size: 0.72rem; color: #777; text-transform: uppercase;'>Usuário</div><div style='font-weight: 700; font-size: 1.05rem; color: #ffffff;'>{usuario_atual}</div><div style='font-size: 0.75rem; color: #a89f81; margin: 2px 0 10px 0;'>{user_email}</div>{badge_html}</div>", unsafe_allow_html=True)
     
     opcoes_menu = ["📥 Upload de Extratos", "📊 Dashboard & Métricas", "🔮 Planejamento Futuro", "⭐ Assinatura PRO"]
-    if eh_master:
+    if eh_admin:
         opcoes_menu.append("👥 Gestão de Usuários")
         
     menu_selecionado = st.radio("Menu", opcoes_menu, label_visibility="collapsed")
@@ -388,10 +391,10 @@ elif menu_selecionado == "⭐ Assinatura PRO":
         st.markdown("<div class='glass-card' style='border-color: #00e676; text-align: center; margin-top: 20px;'><h3 style='color: #00e676 !important; margin: 0;'>✔ Assinatura PRO Ativa</h3><p style='color: #aaa; margin: 5px 0 0 0;'>Você possui acesso a todos os recursos ilimitados do MFC.</p></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 👥 ABA 5: GESTÃO DE USUÁRIOS (MASTER)
+# 👥 ABA 5: GESTÃO DE USUÁRIOS (EXCLUSIVA PARA ADMIN)
 # ==========================================
-elif menu_selecionado == "👥 Gestão de Usuários" and eh_master:
-    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão exclusiva do administrador.</p></div>", unsafe_allow_html=True)
+elif menu_selecionado == "👥 Gestão de Usuários" and eh_admin:
+    st.markdown("<div class='glass-card'><h2 style='margin:0; color:#d4af37;'>👥 Painel de Controle de Usuários</h2><p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Visão exclusiva do administrador (admin).</p></div>", unsafe_allow_html=True)
     
     lista_usuarios = []
     for nome_u, info_u in st.session_state["usuarios_db"].items():
