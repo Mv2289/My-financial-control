@@ -197,9 +197,6 @@ css_style = """
         visibility: hidden !important;
         pointer-events: none !important;
     }
-    #MainMenu, footer {
-        visibility: hidden !important;
-    }
 </style>
 <script>
     window.parent.document.addEventListener('keydown', function(e) {
@@ -392,6 +389,23 @@ eh_pro = (plano_atual == "Pro")
 user_email = dados_usuario.get("email", "")
 
 eh_admin = (usuario_atual == "admin")
+
+# Oculta menus do Streamlit apenas para clientes; mantém aparente caso seja a conta admin
+if not eh_admin:
+    st.markdown("""
+    <style>
+        #MainMenu, footer, header {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+        .viewerBadge_container__1Qobw, [data-testid="stDecoration"] {
+            display: none !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 mp_access_token = st.secrets.get("MP_ACCESS_TOKEN", "")
@@ -804,9 +818,7 @@ elif menu_selecionado == "chat_ia":
         st.markdown(
             "<div class='glass-card'>"
             "<h2 style='margin:0; color:#d4af37;'>💬 Consultor Financeiro IA</h2>"
-            "<p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>"
-            "Tire dúvidas estratégicas sobre seus extratos, receba diagnósticos de gastos e planos de economia."
-            "</p></div>",
+            "<p style='color:#aaa; font-size:0.95rem; margin-top:4px;'>Tire dúvidas estratégicas sobre seus extratos, receba diagnósticos de gastos e planos de economia.</p></div>",
             unsafe_allow_html=True
         )
         
