@@ -15,8 +15,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilo institucional XP
-css_style = "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'); html, body, [class*='css'], .stApp { font-family: 'Inter', sans-serif !important; background-color: #08090b !important; color: #e5e5e5 !important; } section[data-testid='stSidebar'] { background-color: #0d0f14 !important; border-right: 1px solid rgba(212, 175, 55, 0.12) !important; } .brand-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 2px; color: #d4af37; margin: 0; line-height: 1; text-align: center; } .brand-subtitle { font-size: 0.78rem; letter-spacing: 4px; text-transform: uppercase; color: #9e9575; margin-top: 4px; font-weight: 600; text-align: center; margin-bottom: 20px; } .glass-card { background: rgba(18, 20, 26, 0.7); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 14px; padding: 24px; margin-bottom: 20px; } .kpi-box { background: #0f1117; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 20px; text-align: center; } .kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a89f81; margin-bottom: 6px; } .kpi-val { font-size: 1.7rem; font-weight: 800; margin: 0; } div.stButton > button { background: #d4af37 !important; color: #08090b !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; padding: 10px 20px !important; font-weight: 700 !important; } div.stButton > button:hover { background: #e6c35c !important; border-color: #e6c35c !important; color: #000000 !important; } .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; }</style>"
+# Estilo institucional XP com ocultação do menu em inglês da tabela
+css_style = "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap'); html, body, [class*='css'], .stApp { font-family: 'Inter', sans-serif !important; background-color: #08090b !important; color: #e5e5e5 !important; } section[data-testid='stSidebar'] { background-color: #0d0f14 !important; border-right: 1px solid rgba(212, 175, 55, 0.12) !important; } .brand-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 2px; color: #d4af37; margin: 0; line-height: 1; text-align: center; } .brand-subtitle { font-size: 0.78rem; letter-spacing: 4px; text-transform: uppercase; color: #9e9575; margin-top: 4px; font-weight: 600; text-align: center; margin-bottom: 20px; } .glass-card { background: rgba(18, 20, 26, 0.7); border: 1px solid rgba(212, 175, 55, 0.15); border-radius: 14px; padding: 24px; margin-bottom: 20px; } .kpi-box { background: #0f1117; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; padding: 20px; text-align: center; } .kpi-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #a89f81; margin-bottom: 6px; } .kpi-val { font-size: 1.7rem; font-weight: 800; margin: 0; } div.stButton > button { background: #d4af37 !important; color: #08090b !important; border: 1px solid #d4af37 !important; border-radius: 8px !important; padding: 10px 20px !important; font-weight: 700 !important; } div.stButton > button:hover { background: #e6c35c !important; border-color: #e6c35c !important; color: #000000 !important; } .pro-tag { background: rgba(212, 175, 55, 0.15); color: #d4af37; border: 1px solid #d4af37; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } .pending-tag { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid #ffc107; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; display: inline-block; } [data-testid='stDataFrameHeader'] button, [data-testid='stDataFrameHeaderMenu'] { display: none !important; }</style>"
 st.markdown(css_style, unsafe_allow_html=True)
 
 # Disparo de e-mail institucional
@@ -304,7 +304,34 @@ elif menu_selecionado == "dashboard":
         
         with c_tab:
             st.markdown("### 📋 Lançamentos Conciliados")
-            df_render = df_raw[["data", "descricao", "tipo", "valor"]].copy()
+            
+            # Filtros nativos em português
+            f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
+            with f_col1:
+                busca = st.text_input("🔍 Buscar lançamento", placeholder="Nome ou comércio...")
+            with f_col2:
+                filtro_tipo = st.selectbox("Tipo", ["Todos", "Receitas", "Despesas"])
+            with f_col3:
+                ordem = st.selectbox("Ordenar por", ["Mais Recentes", "Mais Antigos", "Maior Valor", "Menor Valor"])
+
+            df_filtrado = df_raw.copy()
+            if busca:
+                df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
+            if filtro_tipo == "Receitas":
+                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
+            elif filtro_tipo == "Despesas":
+                df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
+
+            if ordem == "Mais Recentes":
+                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
+            elif ordem == "Mais Antigos":
+                df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=True)
+            elif ordem == "Maior Valor":
+                df_filtrado = df_filtrado.sort_values(by="valor", ascending=False)
+            elif ordem == "Menor Valor":
+                df_filtrado = df_filtrado.sort_values(by="valor", ascending=True)
+
+            df_render = df_filtrado[["data", "descricao", "tipo", "valor"]].copy()
             st.dataframe(
                 df_render,
                 use_container_width=True,
@@ -315,7 +342,7 @@ elif menu_selecionado == "dashboard":
                     "tipo": "Tipo",
                     "valor": st.column_config.NumberColumn("Valor (R$)", format="R$ %.2f")
                 },
-                height=450
+                height=380
             )
             
         with c_graf:
