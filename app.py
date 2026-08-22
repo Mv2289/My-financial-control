@@ -470,25 +470,7 @@ elif menu_selecionado == "dashboard":
         df_raw["data_dt"] = pd.to_datetime(df_raw["data"], format="%d/%m/%Y", errors="coerce")
         df_raw = df_raw.sort_values(by="data_dt", ascending=False)
         
-        df_rec = df_raw[df_raw["tipo"] == "Receita"]
-        df_des = df_raw[df_raw["tipo"] == "Despesa"]
-        
-        total_entradas = float(df_rec["valor"].sum())
-        total_saidas = float(df_des["valor"].sum())
-        saldo_liquido = total_entradas - total_saidas
-        taxa_poupanca = ((saldo_liquido / total_entradas) * 100.0) if total_entradas > 0 else 0.0
-        cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
-
-        k1, k2, k3, k4 = st.columns(4)
-        k1.markdown("<div class='kpi-box'><div class='kpi-label'>Receitas</div><div class='kpi-val' style='color: #00e676;'>+ R$ {:,.2f}</div></div>".format(total_entradas), unsafe_allow_html=True)
-        k2.markdown("<div class='kpi-box'><div class='kpi-label'>Despesas</div><div class='kpi-val' style='color: #ff5252;'>- R$ {:,.2f}</div></div>".format(total_saidas), unsafe_allow_html=True)
-        k3.markdown("<div class='kpi-box'><div class='kpi-label'>Saldo Líquido</div><div class='kpi-val' style='color: {};'>R$ {:,.2f}</div></div>".format(cor_saldo, saldo_liquido), unsafe_allow_html=True)
-        k4.markdown("<div class='kpi-box'><div class='kpi-label'>Taxa de Poupança</div><div class='kpi-val' style='color: #d4af37;'>{:.1f}%</div></div>".format(taxa_poupanca), unsafe_allow_html=True)
-        
-        st.write("")
-        st.write("")
-        
-        # Filtros de busca
+        # Filtros de busca e período no topo para sincronização
         st.markdown("### 📋 Lançamentos Conciliados")
         f1, f2, f3, f4 = st.columns([1.2, 0.9, 0.9, 1.2])
         with f1:
@@ -507,18 +489,42 @@ elif menu_selecionado == "dashboard":
                 
             intervalo_data = st.date_input("Período", value=(min_val, max_val), format="DD/MM/YYYY")
 
-        df_filtrado = df_raw.copy()
+        # Dataset filtrado pelo período para padronizar KPIs, Pizza e Tabela
+        df_periodo = df_raw.copy()
+        if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
+            d_ini, d_fim = intervalo_data
+            df_periodo = df_periodo[(df_periodo["data_dt"].dt.date >= d_ini) & (df_periodo["data_dt"].dt.date <= d_fim)]
+
+        df_rec_periodo = df_periodo[df_periodo["tipo"] == "Receita"]
+        df_des_periodo = df_periodo[df_periodo["tipo"] == "Despesa"]
         
+        total_entradas = float(df_rec_periodo["valor"].sum())
+        total_saidas = float(df_des_periodo["valor"].sum())
+        saldo_liquido = total_entradas - total_saidas
+        if total_entradas > 0:
+            taxa_poupanca = (saldo_liquido / total_entradas) * 100.0
+        else:
+            taxa_poupanca = 0.0
+        cor_saldo = "#00e676" if saldo_liquido >= 0 else "#ff5252"
+
+        # Cards KPIs sincronizados com o período selecionado
+        k1, k2, k3, k4 = st.columns(4)
+        k1.markdown("<div class='kpi-box'><div class='kpi-label'>Receitas</div><div class='kpi-val' style='color: #00e676;'>+ R$ {:,.2f}</div></div>".format(total_entradas), unsafe_allow_html=True)
+        k2.markdown("<div class='kpi-box'><div class='kpi-label'>Despesas</div><div class='kpi-val' style='color: #ff5252;'>- R$ {:,.2f}</div></div>".format(total_saidas), unsafe_allow_html=True)
+        k3.markdown("<div class='kpi-box'><div class='kpi-label'>Saldo Líquido</div><div class='kpi-val' style='color: {};'>R$ {:,.2f}</div></div>".format(cor_saldo, saldo_liquido), unsafe_allow_html=True)
+        k4.markdown("<div class='kpi-box'><div class='kpi-label'>Taxa de Poupança</div><div class='kpi-val' style='color: #d4af37;'>{:.1f}%</div></div>".format(taxa_poupanca), unsafe_allow_html=True)
+        
+        st.write("")
+        st.write("")
+
+        # Filtros adicionais para tabela (texto e tipo)
+        df_filtrado = df_periodo.copy()
         if busca:
             df_filtrado = df_filtrado[df_filtrado["descricao"].str.contains(busca, case=False, na=False)]
         if filtro_tipo == "Receitas":
             df_filtrado = df_filtrado[df_filtrado["tipo"] == "Receita"]
         elif filtro_tipo == "Despesas":
             df_filtrado = df_filtrado[df_filtrado["tipo"] == "Despesa"]
-
-        if isinstance(intervalo_data, (tuple, list)) and len(intervalo_data) == 2:
-            d_ini, d_fim = intervalo_data
-            df_filtrado = df_filtrado[(df_filtrado["data_dt"].dt.date >= d_ini) & (df_filtrado["data_dt"].dt.date <= d_fim)]
 
         if ordem == "Mais Recentes":
             df_filtrado = df_filtrado.sort_values(by="data_dt", ascending=False)
@@ -546,7 +552,7 @@ elif menu_selecionado == "dashboard":
             )
             
         with c_pie:
-            st.markdown("##### 🍩 Proporção de Fluxo")
+            st.markdown("##### 📊 Proporção de Fluxo")
             total_vol = total_entradas + total_saidas
             fig_pie = go.Figure(data=[go.Pie(
                 labels=["Receitas", "Despesas"],
@@ -568,7 +574,7 @@ elif menu_selecionado == "dashboard":
             st.plotly_chart(fig_pie, use_container_width=True)
 
         # ==========================================
-        # NOVO: GRÁFICO COMPARATIVO EM ESCALA (BARRAS AGRUPADAS + TOTAL)
+        # GRÁFICO COMPARATIVO GERAL EM ESCALA (TODOS OS MESES + TOTAL GERAL)
         # ==========================================
         st.write("")
         st.markdown("### 📊 Evolução Mensal e Comparativo de Gastos")
@@ -590,14 +596,15 @@ elif menu_selecionado == "dashboard":
                 receitas_mes.append(rec)
                 despesas_mes.append(des)
                 
-            # Adiciona a coluna final de "Total" (conforme solicitado na imagem)
+            total_geral_receitas = float(df_evol[df_evol["tipo"] == "Receita"]["valor"].sum())
+            total_geral_despesas = float(df_evol[df_evol["tipo"] == "Despesa"]["valor"].sum())
+            
             labels_com_total = meses_labels + ["Total"]
-            receitas_com_total = receitas_mes + [total_entradas]
-            despesas_com_total = despesas_mes + [total_saidas]
+            receitas_com_total = receitas_mes + [total_geral_receitas]
+            despesas_com_total = despesas_mes + [total_geral_despesas]
             
             fig_barras = go.Figure()
             
-            # Barra de Receitas (Verde)
             fig_barras.add_trace(go.Bar(
                 name="Receitas / Ganhos",
                 x=labels_com_total,
@@ -608,7 +615,6 @@ elif menu_selecionado == "dashboard":
                 textfont=dict(color="#00e676", size=11, family="Inter")
             ))
             
-            # Barra de Despesas (Vermelha)
             fig_barras.add_trace(go.Bar(
                 name="Despesas / Gastos",
                 x=labels_com_total,
@@ -848,38 +854,3 @@ elif menu_selecionado == "usuarios" and eh_admin:
         
         lista_usuarios.append({
             "Usuário": nome_u,
-            "E-mail": info_u.get("email", "-"),
-            "Senha": info_u.get("senha", "-"),
-            "Plano Atual": plano,
-            "Data Aquisição": dt_aquisicao,
-            "Data Vencimento": dt_vencimento,
-            "Vigência": status_vigencia
-        })
-        
-    df_users = pd.DataFrame(lista_usuarios)
-    st.dataframe(df_users, use_container_width=True, hide_index=True)
-    st.write("")
-    st.markdown("### ⚡ Ações Rápidas de Planos")
-    
-    for u, dados in list(st.session_state["usuarios_db"].items()):
-        col_m1, col_m2, col_m3 = st.columns([2.5, 1.2, 1.2])
-        status_color = "#00e676" if dados['plano'] == 'Pro' else "#888888"
-        venc_texto = f" (Vence: {dados.get('data_vencimento')})" if dados.get('data_vencimento') and u != 'admin' else ""
-        
-        col_m1.markdown(f"<b>{u}</b> — <span style='color:{status_color}; font-weight:bold;'>{dados['plano']}</span><small style='color:#aaa;'>{venc_texto}</small>", unsafe_allow_html=True)
-        col_m1.caption(f"E-mail: {dados.get('email', '-')}")
-        
-        if dados["plano"] != "Pro":
-            if col_m2.button("⭐ Ativar 30 Dias", key="btn_pro_" + str(u)):
-                ativar_plano_pro(u)
-                st.success(f"{u} agora é PRO por 30 dias!")
-                st.rerun()
-        else:
-            if u not in ["admin"]:
-                if col_m3.button("❌ Desativar", key="btn_down_" + str(u)):
-                    st.session_state["usuarios_db"][u]["plano"] = "Gratuito"
-                    st.session_state["usuarios_db"][u]["data_vencimento"] = None
-                    st.info(f"{u} voltou ao Básico.")
-                    st.rerun()
-                    
-        st.markdown("---")
