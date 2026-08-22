@@ -310,7 +310,7 @@ elif menu_selecionado == "📊 Dashboard & Métricas":
             )
             
         with c_graf:
-            st.markdown("### 🍩 Proporção de Fluxo")
+            st.markdown("### 📊 Proporção de Fluxo")
             total_vol = total_entradas + total_saidas
             fig = go.Figure(data=[go.Pie(
                 labels=["Receitas", "Despesas"],
